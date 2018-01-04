@@ -257,11 +257,7 @@ class ParseServer {
     // perform a health check on the serverURL value
     if(Parse.serverURL) {
       const request = require('request');
-      console.log(`Parse Server URL is ${Parse.serverURL}`);
       request(Parse.serverURL.replace(/\/$/, "") + "/health", function (error, response, body) {
-        console.log(`Verify server response ${response}`);
-        console.log(`Verify server error ${error}`);
-        console.log(`Verify server body ${body}`);
         let json;
         try {
           json = JSON.parse(body);
