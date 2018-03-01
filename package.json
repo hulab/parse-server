@@ -1,6 +1,6 @@
 {
   "name": "parse-server",
-  "version": "2.7.2",
+  "version": "2.7.2-hulab-1",
   "description": "An express module providing a Parse-compatible API server",
   "main": "lib/index.js",
   "repository": {
@@ -33,7 +33,7 @@
     "mime": "2.2.0",
     "mongodb": "3.0.1",
     "multer": "1.3.0",
-    "parse": "1.11.0",
+    "parse": "git://github.com/hulab/Parse-SDK-JS.git#master",
     "pg-promise": "7.4.0",
     "redis": "2.8.0",
     "request": "2.83.0",
