@@ -4,7 +4,7 @@ const Parse  = require('parse/node').Parse;
 
 const graphRequest = (path) => {
   return new Promise((resolve, reject) => {
-    https.get(`https://graph.accountkit.com/v1.1/${path}`, (res) => {
+    https.get(`https://graph.accountkit.com/v1.3/${path}`, (res) => {
       var data = '';
       res.on('data', (chunk) => {
         data += chunk;
