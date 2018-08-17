@@ -3,7 +3,7 @@ const httpsRequest = require('./httpsRequest');
 const Parse  = require('parse/node').Parse;
 
 const graphRequest = (path) => {
-  return httpsRequest.get(`https://graph.accountkit.com/v1.1/${path}`);
+  return httpsRequest.get(`https://graph.accountkit.com/v1.3/${path}`);
 };
 
 function getRequestPath(authData, options) {
