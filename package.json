@@ -1,6 +1,6 @@
 {
   "name": "parse-server",
-  "version": "3.2.3-hulab-1",
+  "version": "3.2.3-hulab-2",
   "description": "An express module providing a Parse-compatible API server",
   "main": "lib/index.js",
   "repository": {
@@ -89,7 +89,6 @@
     "parse-server": "./bin/parse-server"
   },
   "optionalDependencies": {
-    "bcrypt": "3.0.5",
     "uws": "10.148.1"
   },
   "collective": {
