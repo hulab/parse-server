@@ -18,6 +18,8 @@ import type {
   FullQueryOptions,
 } from '../Adapters/Storage/StorageAdapter';
 
+import AWSXRay from 'hulab-xray-sdk';
+
 function addWriteACL(query, acl) {
   const newQuery = _.cloneDeep(query);
   //Can't be any existing '_wperm' query, we don't allow client queries on that, no need to $and
@@ -1289,182 +1291,200 @@ class DatabaseController {
     op = count === true ? 'count' : op;
 
     let classExists = true;
-    return this.loadSchemaIfNeeded(validSchemaController).then(
-      schemaController => {
-        //Allow volatile classes if querying with Master (for _PushStatus)
-        //TODO: Move volatile classes concept into mongo adapter, postgres adapter shouldn't care
-        //that api.parse.com breaks when _PushStatus exists in mongo.
-        return schemaController
-          .getOneSchema(className, isMaster)
-          .catch(error => {
-            // Behavior for non-existent classes is kinda weird on Parse.com. Probably doesn't matter too much.
-            // For now, pretend the class exists but has no objects,
-            if (error === undefined) {
-              classExists = false;
-              return { fields: {} };
+    return tracePromise(
+      'loadSchema',
+      className,
+      this.loadSchemaIfNeeded(validSchemaController)
+    ).then(schemaController => {
+      //Allow volatile classes if querying with Master (for _PushStatus)
+      //TODO: Move volatile classes concept into mongo adapter, postgres adapter shouldn't care
+      //that api.parse.com breaks when _PushStatus exists in mongo.
+      return tracePromise(
+        'getOneSchema',
+        className,
+        schemaController.getOneSchema(className, isMaster)
+      )
+        .catch(error => {
+          // Behavior for non-existent classes is kinda weird on Parse.com. Probably doesn't matter too much.
+          // For now, pretend the class exists but has no objects,
+          if (error === undefined) {
+            classExists = false;
+            return { fields: {} };
+          }
+          throw error;
+        })
+        .then(schema => {
+          // Parse.com treats queries on _created_at and _updated_at as if they were queries on createdAt and updatedAt,
+          // so duplicate that behavior here. If both are specified, the correct behavior to match Parse.com is to
+          // use the one that appears first in the sort list.
+          if (sort._created_at) {
+            sort.createdAt = sort._created_at;
+            delete sort._created_at;
+          }
+          if (sort._updated_at) {
+            sort.updatedAt = sort._updated_at;
+            delete sort._updated_at;
+          }
+
+          const queryOptions = {
+            skip,
+            limit,
+            sort,
+            keys,
+            readPreference,
+            hint,
+            caseInsensitive,
+            explain,
+          };
+          Object.keys(sort).forEach(fieldName => {
+            if (fieldName.match(/^authData\.([a-zA-Z0-9_]+)\.id$/)) {
+              throw new Parse.Error(
+                Parse.Error.INVALID_KEY_NAME,
+                `Cannot sort by ${fieldName}`
+              );
             }
-            throw error;
-          })
-          .then(schema => {
-            // Parse.com treats queries on _created_at and _updated_at as if they were queries on createdAt and updatedAt,
-            // so duplicate that behavior here. If both are specified, the correct behavior to match Parse.com is to
-            // use the one that appears first in the sort list.
-            if (sort._created_at) {
-              sort.createdAt = sort._created_at;
-              delete sort._created_at;
+            const rootFieldName = getRootFieldName(fieldName);
+            if (!SchemaController.fieldNameIsValid(rootFieldName)) {
+              throw new Parse.Error(
+                Parse.Error.INVALID_KEY_NAME,
+                `Invalid field name: ${fieldName}.`
+              );
             }
-            if (sort._updated_at) {
-              sort.updatedAt = sort._updated_at;
-              delete sort._updated_at;
-            }
-            const queryOptions = {
-              skip,
-              limit,
-              sort,
-              keys,
-              readPreference,
-              hint,
-              caseInsensitive,
-              explain,
-            };
-            Object.keys(sort).forEach(fieldName => {
-              if (fieldName.match(/^authData\.([a-zA-Z0-9_]+)\.id$/)) {
-                throw new Parse.Error(
-                  Parse.Error.INVALID_KEY_NAME,
-                  `Cannot sort by ${fieldName}`
-                );
-              }
-              const rootFieldName = getRootFieldName(fieldName);
-              if (!SchemaController.fieldNameIsValid(rootFieldName)) {
-                throw new Parse.Error(
-                  Parse.Error.INVALID_KEY_NAME,
-                  `Invalid field name: ${fieldName}.`
-                );
-              }
-            });
-            return (isMaster
-              ? Promise.resolve()
-              : schemaController.validatePermission(className, aclGroup, op)
+          });
+          return (isMaster
+            ? Promise.resolve()
+            : tracePromise(
+              'validatePermission',
+              className,
+              schemaController.validatePermission(className, aclGroup, op)
             )
-              .then(() =>
+          )
+            .then(() =>
+              tracePromise(
+                'reduceRelationKeys',
+                className,
                 this.reduceRelationKeys(className, query, queryOptions)
               )
-              .then(() =>
+            )
+            .then(() =>
+              tracePromise(
+                'reduceInRelation',
+                className,
                 this.reduceInRelation(className, query, schemaController)
               )
-              .then(() => {
-                let protectedFields;
-                if (!isMaster) {
-                  query = this.addPointerPermissions(
-                    schemaController,
-                    className,
-                    op,
-                    query,
-                    aclGroup
-                  );
-                  /* Don't use projections to optimize the protectedFields since the protectedFields
+            )
+            .then(() => {
+              let protectedFields;
+              if (!isMaster) {
+                query = this.addPointerPermissions(
+                  schemaController,
+                  className,
+                  op,
+                  query,
+                  aclGroup
+                );
+                /* Don't use projections to optimize the protectedFields since the protectedFields
                   based on pointer-permissions are determined after querying. The filtering can
                   overwrite the protected fields. */
-                  protectedFields = this.addProtectedFields(
-                    schemaController,
-                    className,
-                    query,
-                    aclGroup,
-                    auth,
-                    queryOptions
+                protectedFields = this.addProtectedFields(
+                  schemaController,
+                  className,
+                  query,
+                  aclGroup,
+                  auth,
+                  queryOptions
+                );
+              }
+              if (!query) {
+                if (op === 'get') {
+                  throw new Parse.Error(
+                    Parse.Error.OBJECT_NOT_FOUND,
+                    'Object not found.'
                   );
+                } else {
+                  return [];
                 }
-                if (!query) {
-                  if (op === 'get') {
-                    throw new Parse.Error(
-                      Parse.Error.OBJECT_NOT_FOUND,
-                      'Object not found.'
-                    );
-                  } else {
-                    return [];
-                  }
+              }
+              if (!isMaster) {
+                if (op === 'update' || op === 'delete') {
+                  query = addWriteACL(query, aclGroup);
+                } else {
+                  query = addReadACL(query, aclGroup);
                 }
-                if (!isMaster) {
-                  if (op === 'update' || op === 'delete') {
-                    query = addWriteACL(query, aclGroup);
-                  } else {
-                    query = addReadACL(query, aclGroup);
-                  }
-                }
-                validateQuery(query);
-                if (count) {
-                  if (!classExists) {
-                    return 0;
-                  } else {
-                    return this.adapter.count(
-                      className,
-                      schema,
-                      query,
-                      readPreference,
-                      undefined,
-                      hint
-                    );
-                  }
-                } else if (distinct) {
-                  if (!classExists) {
-                    return [];
-                  } else {
-                    return this.adapter.distinct(
-                      className,
-                      schema,
-                      query,
-                      distinct
-                    );
-                  }
-                } else if (pipeline) {
-                  if (!classExists) {
-                    return [];
-                  } else {
-                    return this.adapter.aggregate(
-                      className,
-                      schema,
-                      pipeline,
-                      readPreference,
-                      hint,
-                      explain
-                    );
-                  }
-                } else if (explain) {
-                  return this.adapter.find(
+              }
+              validateQuery(query);
+              if (count) {
+                if (!classExists) {
+                  return 0;
+                } else {
+                  return this.adapter.count(
                     className,
                     schema,
                     query,
-                    queryOptions
+                    readPreference,
+                    undefined,
+                    hint
                   );
-                } else {
-                  return this.adapter
-                    .find(className, schema, query, queryOptions)
-                    .then(objects =>
-                      objects.map(object => {
-                        object = untransformObjectACL(object);
-                        return filterSensitiveData(
-                          isMaster,
-                          aclGroup,
-                          auth,
-                          op,
-                          schemaController,
-                          className,
-                          protectedFields,
-                          object
-                        );
-                      })
-                    )
-                    .catch(error => {
-                      throw new Parse.Error(
-                        Parse.Error.INTERNAL_SERVER_ERROR,
-                        error
-                      );
-                    });
                 }
-              });
-          });
-      }
-    );
+              } else if (distinct) {
+                if (!classExists) {
+                  return [];
+                } else {
+                  return this.adapter.distinct(
+                    className,
+                    schema,
+                    query,
+                    distinct
+                  );
+                }
+              } else if (pipeline) {
+                if (!classExists) {
+                  return [];
+                } else {
+                  return this.adapter.aggregate(
+                    className,
+                    schema,
+                    pipeline,
+                    readPreference,
+                    hint,
+                    explain
+                  );
+                }
+              } else if (explain) {
+                return this.adapter.find(
+                  className,
+                  schema,
+                  query,
+                  queryOptions
+                );
+              } else {
+                return this.adapter
+                  .find(className, schema, query, queryOptions)
+                  .then(objects =>
+                    objects.map(object => {
+                      object = untransformObjectACL(object);
+                      return filterSensitiveData(
+                        isMaster,
+                        aclGroup,
+                        auth,
+                        op,
+                        schemaController,
+                        className,
+                        protectedFields,
+                        object
+                      );
+                    })
+                  )
+                  .catch(error => {
+                    throw new Parse.Error(
+                      Parse.Error.INTERNAL_SERVER_ERROR,
+                      error
+                    );
+                  });
+              }
+            });
+        });
+    });
   }
 
   deleteSchema(className: string): Promise<void> {
@@ -1825,6 +1845,34 @@ class DatabaseController {
   }
 
   static _validateQuery: any => void;
+}
+
+function tracePromise(operation, className, promise = Promise.resolve()) {
+  const parent = AWSXRay.getSegment();
+  if (!parent) {
+    return promise;
+  }
+  return new Promise((resolve, reject) => {
+    AWSXRay.captureAsyncFunc(
+      `Parse-Server_DatabaseCtrl_${operation}_${className}`,
+      subsegment => {
+        subsegment && subsegment.addAnnotation('Controller', 'DatabaseCtrl');
+        subsegment && subsegment.addAnnotation('Operation', operation);
+        className & subsegment &&
+          subsegment.addAnnotation('ClassName', className);
+        (promise instanceof Promise ? promise : Promise.resolve(promise)).then(
+          function(result) {
+            resolve(result);
+            subsegment && subsegment.close();
+          },
+          function(error) {
+            reject(error);
+            subsegment && subsegment.close(error);
+          }
+        );
+      }
+    );
+  });
 }
 
 module.exports = DatabaseController;

@@ -109,13 +109,27 @@ export class FunctionsRouter extends PromiseRouter {
           return reject(message);
         }
 
-        const code = Parse.Error.SCRIPT_FAILED;
+        let code = Parse.Error.SCRIPT_FAILED;
         // If it's an error, mark it as a script failed
         if (typeof message === 'string') {
           return reject(new Parse.Error(code, message));
         }
         if (message instanceof Error) {
           message = message.message;
+        }
+        if (message instanceof Object
+          && Object.prototype.hasOwnProperty.call(message, "code")
+          && Object.prototype.hasOwnProperty.call(message, "message")
+        ) {
+          code = message.code;
+          message = message.message;
+        }
+        if (message instanceof Object) {
+          try {
+            message = JSON.stringify(message);
+          } catch (_) {
+            //
+          }
         }
         reject(new Parse.Error(code, message));
       },

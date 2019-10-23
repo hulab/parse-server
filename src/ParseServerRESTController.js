@@ -1,3 +1,4 @@
+const AWSXRay = require('hulab-xray-sdk');
 const Config = require('./Config');
 const Auth = require('./Auth');
 const RESTController = require('parse/lib/node/RESTController');
@@ -99,7 +100,7 @@ function ParseServerRESTController(applicationId, router) {
     }
 
     return new Promise((resolve, reject) => {
-      getAuth(options, config).then(auth => {
+      tracePromise('getAuth', getAuth(options, config)).then(auth => {
         const request = {
           body: data,
           config,
@@ -138,6 +139,33 @@ function ParseServerRESTController(applicationId, router) {
     request: handleRequest,
     ajax: RESTController.ajax,
   };
+}
+
+function tracePromise(operation, promise = Promise.resolve()) {
+  const parent = AWSXRay.getSegment();
+  if (!parent) {
+    return promise;
+  }
+  return new Promise((resolve, reject) => {
+    AWSXRay.captureAsyncFunc(
+      `Parse-Server_RESTController_${operation}`,
+      subsegment => {
+        subsegment &&
+          subsegment.addAnnotation('Controller', 'ParseServerRESTController');
+        subsegment && subsegment.addAnnotation('Operation', operation);
+        (promise instanceof Promise ? promise : Promise.resolve(promise)).then(
+          function(result) {
+            resolve(result);
+            subsegment && subsegment.close();
+          },
+          function(error) {
+            reject(error);
+            subsegment && subsegment.close(error);
+          }
+        );
+      }
+    );
+  });
 }
 
 export default ParseServerRESTController;

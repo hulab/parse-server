@@ -6,6 +6,7 @@
 // This means that one of these handlers can support multiple
 // routes. That's useful for the routes that do really similar
 // things.
+const AWSXRay = require('hulab-xray-sdk');
 
 var Parse = require('parse/node').Parse;
 
@@ -304,10 +305,33 @@ function enforceRoleSecurity(method, className, auth) {
   }
 }
 
+function tracePromise(operation, promise = Promise.resolve()) {
+  const parent = AWSXRay.getSegment();
+  if (!parent) {
+    return promise;
+  }
+  return new Promise((resolve, reject) => {
+    AWSXRay.captureAsyncFunc(`Parse-Server_rest_${operation}`, subsegment => {
+      subsegment && subsegment.addAnnotation('Controller', 'rest');
+      subsegment && subsegment.addAnnotation('Operation', operation);
+      (promise instanceof Promise ? promise : Promise.resolve(promise)).then(
+        function(result) {
+          resolve(result);
+          subsegment && subsegment.close();
+        },
+        function(error) {
+          reject(error);
+          subsegment && subsegment.close(error);
+        }
+      );
+    });
+  });
+}
+
 module.exports = {
-  create,
-  del,
-  find,
-  get,
-  update,
+  create: tracePromise('create', create),
+  del: tracePromise('del', del),
+  find: tracePromise('find', find),
+  get: tracePromise('get', get),
+  update: tracePromise('update', update),
 };

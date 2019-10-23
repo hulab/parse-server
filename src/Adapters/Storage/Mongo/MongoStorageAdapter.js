@@ -512,6 +512,44 @@ export class MongoStorageAdapter implements StorageAdapter {
       .catch(err => this.handleError(err));
   }
 
+  // Added to allow the creation of multiple objects at once
+  createObjects(
+    className: string,
+    schema: SchemaType,
+    objects: any,
+    transactionalSession: ?any
+  ) {
+    schema = convertParseSchemaToMongoSchema(schema);
+    const mongoObjects = objects.map(object =>
+      parseObjectToMongoObjectForCreate(className, object, schema)
+    );
+    return this._adaptiveCollection(className)
+      .then(collection =>
+        collection.insertMany(mongoObjects, transactionalSession)
+      )
+      .catch(error => {
+        if (error.code === 11000) {
+          // Duplicate value
+          const err = new Parse.Error(
+            Parse.Error.DUPLICATE_VALUE,
+            'A duplicate value for a field with unique values was provided'
+          );
+          err.underlyingError = error;
+          if (error.message) {
+            const matches = error.message.match(
+              /index:[\sa-zA-Z0-9_\-\.]+\$?([a-zA-Z_-]+)_1/
+            );
+            if (matches && Array.isArray(matches)) {
+              err.userInfo = { duplicated_field: matches[1] };
+            }
+          }
+          throw err;
+        }
+        throw error;
+      })
+      .catch(err => this.handleError(err));
+  }
+
   // Remove all objects that match the given Parse Query.
   // If no objects match, reject with OBJECT_NOT_FOUND. If objects are found and deleted, resolve with undefined.
   // If there is some other error, reject with INTERNAL_SERVER_ERROR.
@@ -911,6 +949,8 @@ export class MongoStorageAdapter implements StorageAdapter {
       return null;
     } else if (Array.isArray(pipeline)) {
       return pipeline.map(value => this._parseAggregateArgs(schema, value));
+    } else if (pipeline instanceof Date) {
+      return pipeline;
     } else if (typeof pipeline === 'object') {
       const returnValue = {};
       for (const field in pipeline) {
@@ -928,6 +968,8 @@ export class MongoStorageAdapter implements StorageAdapter {
           schema.fields[field].type === 'Date'
         ) {
           returnValue[field] = this._convertToDate(pipeline[field]);
+        } else if (pipeline[field] && pipeline[field].__type === "Date") {
+          returnValue[field] = this._convertToDate(pipeline[field].iso);
         } else {
           returnValue[field] = this._parseAggregateArgs(
             schema,
