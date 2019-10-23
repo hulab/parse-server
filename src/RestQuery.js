@@ -1,5 +1,6 @@
 // An object that encapsulates everything we need to run a 'find'
 // operation, encoded in the REST API format.
+const AWSXRay = require('hulab-xray-sdk');
 
 var SchemaController = require('./Controllers/SchemaController');
 var Parse = require('parse/node').Parse;
@@ -191,25 +192,49 @@ function RestQuery(
 RestQuery.prototype.execute = function(executeOptions) {
   return Promise.resolve()
     .then(() => {
-      return this.buildRestWhere();
+      return tracePromise(
+        'buildRestWhere',
+        this.className,
+        this.buildRestWhere()
+      );
     })
     .then(() => {
-      return this.handleIncludeAll();
+      return tracePromise(
+        'handleIncludeAll',
+        this.className,
+        this.handleIncludeAll()
+      );
     })
     .then(() => {
-      return this.handleExcludeKeys();
+      return tracePromise(
+        'handleExcludeKeys',
+        this.className,
+        this.handleExcludeKeys()
+      );
     })
     .then(() => {
-      return this.runFind(executeOptions);
+      return tracePromise(
+        'runFind',
+        this.className,
+        this.runFind(executeOptions)
+      );
     })
     .then(() => {
-      return this.runCount();
+      return tracePromise('runCount', this.className, this.runCount());
     })
     .then(() => {
-      return this.handleInclude();
+      return tracePromise(
+        'handleInclude',
+        this.className,
+        this.handleInclude()
+      );
     })
     .then(() => {
-      return this.runAfterFindTrigger();
+      return tracePromise(
+        'runAfterFindTrigger',
+        this.className,
+        this.runAfterFindTrigger()
+      );
     })
     .then(() => {
       return this.response;
@@ -251,28 +276,60 @@ RestQuery.prototype.each = function(callback) {
 RestQuery.prototype.buildRestWhere = function() {
   return Promise.resolve()
     .then(() => {
-      return this.getUserAndRoleACL();
+      return tracePromise(
+        'getUserAndRoleACL',
+        this.className,
+        this.getUserAndRoleACL()
+      );
     })
     .then(() => {
-      return this.redirectClassNameForKey();
+      return tracePromise(
+        'redirectClassNameForKey',
+        this.className,
+        this.redirectClassNameForKey()
+      );
     })
     .then(() => {
-      return this.validateClientClassCreation();
+      return tracePromise(
+        'validateClientClassCreation',
+        this.className,
+        this.validateClientClassCreation()
+      );
     })
     .then(() => {
-      return this.replaceSelect();
+      return tracePromise(
+        'replaceSelect',
+        this.className,
+        this.replaceSelect()
+      );
     })
     .then(() => {
-      return this.replaceDontSelect();
+      return tracePromise(
+        'replaceDontSelect',
+        this.className,
+        this.replaceDontSelect()
+      );
     })
     .then(() => {
-      return this.replaceInQuery();
+      return tracePromise(
+        'replaceInQuery',
+        this.className,
+        this.replaceInQuery()
+      );
     })
     .then(() => {
-      return this.replaceNotInQuery();
+      return tracePromise(
+        'replaceNotInQuery',
+        this.className,
+        this.replaceNotInQuery()
+      );
     })
     .then(() => {
-      return this.replaceEquality();
+      return tracePromise(
+        'replaceEquality',
+        this.className,
+        this.replaceEquality()
+      );
     });
 };
 
@@ -1010,6 +1067,35 @@ function findObjectWithKey(root, key) {
       return answer;
     }
   }
+}
+
+function tracePromise(operation, className, promise = Promise.resolve()) {
+  // Temporary removing trace here
+  return promise;
+  // const parent = AWSXRay.getSegment();
+  // if (!parent) {
+  //   return promise;
+  // }
+  // return new Promise((resolve, reject) => {
+  //   AWSXRay.captureAsyncFunc(
+  //     `Parse-Server_RestQuery_${operation}_${className}`,
+  //     subsegment => {
+  //       subsegment && subsegment.addAnnotation('Controller', 'RestQuery');
+  //       subsegment && subsegment.addAnnotation('Operation', operation);
+  //       subsegment && subsegment.addAnnotation('ClassName', className);
+  //       (promise instanceof Promise ? promise : Promise.resolve(promise)).then(
+  //         function(result) {
+  //           resolve(result);
+  //           subsegment && subsegment.close();
+  //         },
+  //         function(error) {
+  //           reject(error);
+  //           subsegment && subsegment.close(error);
+  //         }
+  //       );
+  //     }
+  //   );
+  // });
 }
 
 module.exports = RestQuery;

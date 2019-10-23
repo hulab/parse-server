@@ -130,6 +130,8 @@ export class MongoStorageAdapter implements StorageAdapter {
   _uri: string;
   _collectionPrefix: string;
   _mongoOptions: Object;
+  _stream: any;
+  _onchange: any;
   // Public
   connectionPromise: ?Promise<any>;
   database: any;
@@ -147,11 +149,16 @@ export class MongoStorageAdapter implements StorageAdapter {
     this._mongoOptions = mongoOptions;
     this._mongoOptions.useNewUrlParser = true;
     this._mongoOptions.useUnifiedTopology = true;
+    this._onchange = () => {};
 
     // MaxTimeMS is not a global MongoDB client option, it is applied per operation.
     this._maxTimeMS = mongoOptions.maxTimeMS;
     this.canSortOnJoinTables = true;
     delete mongoOptions.maxTimeMS;
+  }
+
+  watch(callback) {
+    this._onchange = callback;
   }
 
   connect() {
@@ -219,7 +226,13 @@ export class MongoStorageAdapter implements StorageAdapter {
   _schemaCollection(): Promise<MongoSchemaCollection> {
     return this.connect()
       .then(() => this._adaptiveCollection(MongoSchemaCollectionName))
-      .then((collection) => new MongoSchemaCollection(collection));
+      .then(collection => {
+        if (!this._stream) {
+          this._stream = collection._mongoCollection.watch();
+          this._stream.on('change', this._onchange);
+        }
+        return new MongoSchemaCollection(collection);
+      });
   }
 
   classExists(name: string) {
@@ -512,6 +525,44 @@ export class MongoStorageAdapter implements StorageAdapter {
       .catch((err) => this.handleError(err));
   }
 
+  // Added to allow the creation of multiple objects at once
+  createObjects(
+    className: string,
+    schema: SchemaType,
+    objects: any,
+    transactionalSession: ?any
+  ) {
+    schema = convertParseSchemaToMongoSchema(schema);
+    const mongoObjects = objects.map(object =>
+      parseObjectToMongoObjectForCreate(className, object, schema)
+    );
+    return this._adaptiveCollection(className)
+      .then(collection =>
+        collection.insertMany(mongoObjects, transactionalSession)
+      )
+      .catch(error => {
+        if (error.code === 11000) {
+          // Duplicate value
+          const err = new Parse.Error(
+            Parse.Error.DUPLICATE_VALUE,
+            'A duplicate value for a field with unique values was provided'
+          );
+          err.underlyingError = error;
+          if (error.message) {
+            const matches = error.message.match(
+              /index:[\sa-zA-Z0-9_\-\.]+\$?([a-zA-Z_-]+)_1/
+            );
+            if (matches && Array.isArray(matches)) {
+              err.userInfo = { duplicated_field: matches[1] };
+            }
+          }
+          throw err;
+        }
+        throw error;
+      })
+      .catch(err => this.handleError(err));
+  }
+
   // Remove all objects that match the given Parse Query.
   // If no objects match, reject with OBJECT_NOT_FOUND. If objects are found and deleted, resolve with undefined.
   // If there is some other error, reject with INTERNAL_SERVER_ERROR.
@@ -597,6 +648,51 @@ export class MongoStorageAdapter implements StorageAdapter {
         throw error;
       })
       .catch((err) => this.handleError(err));
+  }
+
+  updateObjectsByBulk(
+    className: string,
+    schema: SchemaType,
+    operations: any,
+    transactionalSession: ?any
+  ) {
+    schema = convertParseSchemaToMongoSchema(schema);
+    const bulks = operations.map(({updateOne, updateMany, insertOne}) => {
+      return updateOne ? {
+        updateOne: {
+          filter: transformWhere(className, updateOne.filter, schema),
+          update: transformUpdate(className, updateOne.update, schema),
+          upsert: false
+        }
+      } : updateMany ? {
+        updateMany: {
+          filter: transformWhere(className, updateMany.filter, schema),
+          update: transformUpdate(className, updateMany.update, schema),
+          upsert: false
+        }
+      } : {
+        insertOne: {
+          document: parseObjectToMongoObjectForCreate(className, insertOne.document, schema)
+        }
+      };
+    });
+    return this._adaptiveCollection(className)
+      .then(collection =>
+        collection._mongoCollection.bulkWrite(bulks, {
+          session: transactionalSession || undefined
+        })
+      )
+      .then(result => mongoObjectToParseObject(className, result.value, schema))
+      .catch(error => {
+        if (error.code === 11000) {
+          throw new Parse.Error(
+            Parse.Error.DUPLICATE_VALUE,
+            'A duplicate value for a field with unique values was provided'
+          );
+        }
+        throw error;
+      })
+      .catch(err => this.handleError(err));
   }
 
   // Hopefully we can get rid of this. It's only used for config and hooks.
@@ -924,7 +1020,9 @@ export class MongoStorageAdapter implements StorageAdapter {
     if (pipeline === null) {
       return null;
     } else if (Array.isArray(pipeline)) {
-      return pipeline.map((value) => this._parseAggregateArgs(schema, value));
+      return pipeline.map(value => this._parseAggregateArgs(schema, value));
+    } else if (pipeline instanceof Date) {
+      return pipeline;
     } else if (typeof pipeline === 'object') {
       const returnValue = {};
       for (const field in pipeline) {
@@ -942,6 +1040,8 @@ export class MongoStorageAdapter implements StorageAdapter {
           schema.fields[field].type === 'Date'
         ) {
           returnValue[field] = this._convertToDate(pipeline[field]);
+        } else if (pipeline[field] && pipeline[field].__type === "Date") {
+          returnValue[field] = this._convertToDate(pipeline[field].iso);
         } else {
           returnValue[field] = this._parseAggregateArgs(
             schema,

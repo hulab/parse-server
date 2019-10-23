@@ -1,6 +1,7 @@
 // A RestWrite encapsulates everything we need to run an operation
 // that writes to the database.
 // This could be either a "create" or an "update".
+const AWSXRay = require('hulab-xray-sdk');
 
 var SchemaController = require('./Controllers/SchemaController');
 var deepcopy = require('deepcopy');
@@ -109,56 +110,124 @@ function RestWrite(
 RestWrite.prototype.execute = function() {
   return Promise.resolve()
     .then(() => {
-      return this.getUserAndRoleACL();
+      return tracePromise(
+        'getUserAndRoleACL',
+        this.className,
+        this.getUserAndRoleACL()
+      );
     })
     .then(() => {
-      return this.validateClientClassCreation();
+      return tracePromise(
+        'validateClientClassCreation',
+        this.className,
+        this.validateClientClassCreation()
+      );
     })
     .then(() => {
-      return this.handleInstallation();
+      return tracePromise(
+        'handleInstallation',
+        this.className,
+        this.handleInstallation()
+      );
     })
     .then(() => {
-      return this.handleSession();
+      return tracePromise(
+        'handleSession',
+        this.className,
+        this.handleSession()
+      );
     })
     .then(() => {
-      return this.validateAuthData();
+      return tracePromise(
+        'validateAuthData',
+        this.className,
+        this.validateAuthData()
+      );
     })
     .then(() => {
-      return this.runBeforeSaveTrigger();
+      return tracePromise(
+        'runBeforeSaveTrigger',
+        this.className,
+        this.runBeforeSaveTrigger()
+      );
     })
     .then(() => {
-      return this.deleteEmailResetTokenIfNeeded();
+      return tracePromise(
+        'deleteEmailResetTokenIfNeeded',
+        this.className,
+        this.deleteEmailResetTokenIfNeeded()
+      );
     })
     .then(() => {
-      return this.validateSchema();
+      return tracePromise(
+        'validateSchema',
+        this.className,
+        this.validateSchema()
+      );
     })
     .then(schemaController => {
       this.validSchemaController = schemaController;
-      return this.setRequiredFieldsIfNeeded();
+      return tracePromise(
+        'setRequiredFieldsIfNeeded',
+        this.className,
+        this.setRequiredFieldsIfNeeded()
+      );
     })
     .then(() => {
-      return this.transformUser();
+      return tracePromise(
+        'transformUser',
+        this.className,
+        this.transformUser()
+      );
     })
     .then(() => {
-      return this.expandFilesForExistingObjects();
+      return tracePromise(
+        'expandFilesForExistingObjects',
+        this.className,
+        this.expandFilesForExistingObjects()
+      );
     })
     .then(() => {
-      return this.destroyDuplicatedSessions();
+      return tracePromise(
+        'destroyDuplicatedSessions',
+        this.className,
+        this.destroyDuplicatedSessions()
+      );
     })
     .then(() => {
-      return this.runDatabaseOperation();
+      return tracePromise(
+        'runDatabaseOperation',
+        this.className,
+        this.runDatabaseOperation()
+      );
     })
     .then(() => {
-      return this.createSessionTokenIfNeeded();
+      return tracePromise(
+        'createSessionTokenIfNeeded',
+        this.className,
+        this.createSessionTokenIfNeeded()
+      );
     })
     .then(() => {
-      return this.handleFollowup();
+      return tracePromise(
+        'handleFollowup',
+        this.className,
+        this.handleFollowup()
+      );
     })
     .then(() => {
-      return this.runAfterSaveTrigger();
+      return tracePromise(
+        'runAfterSaveTrigger',
+        this.className,
+        this.runAfterSaveTrigger()
+      );
     })
     .then(() => {
-      return this.cleanUserAuthData();
+      return tracePromise(
+        'cleanUserAuthData',
+        this.className,
+        this.cleanUserAuthData()
+      );
     })
     .then(() => {
       return this.response;
@@ -1782,6 +1851,36 @@ RestWrite.prototype._updateResponseWithData = function(response, data) {
   });
   return response;
 };
+
+function tracePromise(operation, className, promise = Promise.resolve()) {
+  // Temporary removing trace here
+  return promise;
+  // const parent = AWSXRay.getSegment();
+  // if (!parent) {
+  //   return promise;
+  // }
+  // return new Promise((resolve, reject) => {
+  //   AWSXRay.captureAsyncFunc(
+  //     `Parse-Server_RestWrite_${operation}_${className}`,
+  //     subsegment => {
+  //       subsegment && subsegment.addAnnotation('Controller', 'RestWrite');
+  //       subsegment && subsegment.addAnnotation('Operation', operation);
+  //       className & subsegment &&
+  //         subsegment.addAnnotation('ClassName', className);
+  //       (promise instanceof Promise ? promise : Promise.resolve(promise)).then(
+  //         function(result) {
+  //           resolve(result);
+  //           subsegment && subsegment.close();
+  //         },
+  //         function(error) {
+  //           reject(error);
+  //           subsegment && subsegment.close(error);
+  //         }
+  //       );
+  //     }
+  //   );
+  // });
+}
 
 export default RestWrite;
 module.exports = RestWrite;
