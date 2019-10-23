@@ -8,6 +8,7 @@ import { promiseEnforceMasterKeyAccess, promiseEnsureIdempotency } from '../midd
 import { jobStatusHandler } from '../StatusHandler';
 import _ from 'lodash';
 import { logger } from '../logger';
+import {getSegment} from 'hulab-xray-sdk';
 
 function parseObject(obj) {
   if (Array.isArray(obj)) {
@@ -106,8 +107,34 @@ export class FunctionsRouter extends PromiseRouter {
         });
       },
       error: function (message) {
-        const error = triggers.resolveError(message);
-        reject(error);
+        // parse error, process away
+        if (message instanceof Parse.Error) {
+          return reject(message);
+        }
+
+        let code = Parse.Error.SCRIPT_FAILED;
+        // If it's an error, mark it as a script failed
+        if (typeof message === 'string') {
+          return reject(new Parse.Error(code, message));
+        }
+        if (message instanceof Error) {
+          message = message.message;
+        }
+        if (message instanceof Object
+          && Object.prototype.hasOwnProperty.call(message, "code")
+          && Object.prototype.hasOwnProperty.call(message, "message")
+        ) {
+          code = message.code;
+          message = message.message;
+        }
+        if (message instanceof Object) {
+          try {
+            message = JSON.stringify(message);
+          } catch (_) {
+            //
+          }
+        }
+        reject(new Parse.Error(code, message));
       },
     };
   }
@@ -155,6 +182,10 @@ export class FunctionsRouter extends PromiseRouter {
         },
         error => {
           try {
+            const xray_segment = getSegment();
+            if (xray_segment) {
+              xray_segment.close(error);
+            }
             logger.error(
               `Failed running cloud function ${functionName} for user ${userString} with:\n  Input: ${cleanInput}\n  Error: ` +
                 JSON.stringify(error),

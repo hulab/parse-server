@@ -15,6 +15,8 @@ import * as SchemaController from './SchemaController';
 import { StorageAdapter } from '../Adapters/Storage/StorageAdapter';
 import type { QueryOptions, FullQueryOptions } from '../Adapters/Storage/StorageAdapter';
 
+import AWSXRay from 'hulab-xray-sdk';
+
 function addWriteACL(query, acl) {
   const newQuery = _.cloneDeep(query);
   //Can't be any existing '_wperm' query, we don't allow client queries on that, no need to $and
@@ -394,13 +396,11 @@ const relationSchema = {
 
 class DatabaseController {
   adapter: StorageAdapter;
-  schemaCache: any;
   schemaPromise: ?Promise<SchemaController.SchemaController>;
   _transactionalSession: ?any;
 
-  constructor(adapter: StorageAdapter, schemaCache: any) {
+  constructor(adapter: StorageAdapter) {
     this.adapter = adapter;
-    this.schemaCache = schemaCache;
     // We don't want a mutable this.schema, because then you could have
     // one request that uses different schemas for different parts of
     // it. Instead, use loadSchema to get a schema.
@@ -434,7 +434,10 @@ class DatabaseController {
     if (this.schemaPromise != null) {
       return this.schemaPromise;
     }
-    this.schemaPromise = SchemaController.load(this.adapter, this.schemaCache, options);
+    this.schemaPromise = SchemaController.load(
+      this.adapter,
+      options
+    );
     this.schemaPromise.then(
       () => delete this.schemaPromise,
       () => delete this.schemaPromise
@@ -916,7 +919,7 @@ class DatabaseController {
    */
   deleteEverything(fast: boolean = false): Promise<any> {
     this.schemaPromise = null;
-    return Promise.all([this.adapter.deleteAllClasses(fast), this.schemaCache.clear()]);
+    return this.adapter.deleteAllClasses(fast);
   }
 
   // Returns a promise for a list of related ids given an owning id.
@@ -1171,12 +1174,19 @@ class DatabaseController {
     op = count === true ? 'count' : op;
 
     let classExists = true;
-    return this.loadSchemaIfNeeded(validSchemaController).then(schemaController => {
+    return tracePromise(
+      'loadSchema',
+      className,
+      this.loadSchemaIfNeeded(validSchemaController)
+    ).then(schemaController => {
       //Allow volatile classes if querying with Master (for _PushStatus)
       //TODO: Move volatile classes concept into mongo adapter, postgres adapter shouldn't care
       //that api.parse.com breaks when _PushStatus exists in mongo.
-      return schemaController
-        .getOneSchema(className, isMaster)
+      return tracePromise(
+        'getOneSchema',
+        className,
+        schemaController.getOneSchema(className, isMaster)
+      )
         .catch(error => {
           // Behavior for non-existent classes is kinda weird on Parse.com. Probably doesn't matter too much.
           // For now, pretend the class exists but has no objects,
@@ -1222,10 +1232,26 @@ class DatabaseController {
           });
           return (isMaster
             ? Promise.resolve()
-            : schemaController.validatePermission(className, aclGroup, op)
+            : tracePromise(
+              'validatePermission',
+              className,
+              schemaController.validatePermission(className, aclGroup, op)
+            )
           )
-            .then(() => this.reduceRelationKeys(className, query, queryOptions))
-            .then(() => this.reduceInRelation(className, query, schemaController))
+            .then(() =>
+              tracePromise(
+                'reduceRelationKeys',
+                className,
+                this.reduceRelationKeys(className, query, queryOptions)
+              )
+            )
+            .then(() =>
+              tracePromise(
+                'reduceInRelation',
+                className,
+                this.reduceInRelation(className, query, schemaController)
+              )
+            )
             .then(() => {
               let protectedFields;
               if (!isMaster) {
@@ -1718,6 +1744,36 @@ class DatabaseController {
   }
 
   static _validateQuery: any => void;
+}
+
+function tracePromise(operation, className, promise = Promise.resolve()) {
+  // Temporary removing trace here
+  // return promise;
+  const parent = AWSXRay.getSegment();
+  if (!parent) {
+    return promise;
+  }
+  return new Promise((resolve, reject) => {
+    AWSXRay.captureAsyncFunc(
+      `Parse-Server_DatabaseCtrl_${operation}_${className}`,
+      subsegment => {
+        subsegment && subsegment.addAnnotation('Controller', 'DatabaseCtrl');
+        subsegment && subsegment.addAnnotation('Operation', operation);
+        className & subsegment &&
+          subsegment.addAnnotation('ClassName', className);
+        (promise instanceof Promise ? promise : Promise.resolve(promise)).then(
+          function(result) {
+            resolve(result);
+            subsegment && subsegment.close();
+          },
+          function(error) {
+            reject(error);
+            subsegment && subsegment.close(error);
+          }
+        );
+      }
+    );
+  });
 }
 
 module.exports = DatabaseController;
