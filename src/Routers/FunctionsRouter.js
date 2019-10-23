@@ -117,6 +117,11 @@ export class FunctionsRouter extends PromiseRouter {
         if (message instanceof Error) {
           message = message.message;
         }
+        try {
+          message = JSON.stringify(message);
+        } catch (_) {
+          //
+        }
         reject(new Parse.Error(code, message));
       },
       message: message,
