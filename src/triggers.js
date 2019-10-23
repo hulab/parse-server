@@ -1,4 +1,6 @@
 // triggers.js
+const AWSXRay = require('hulab-xray-sdk');
+
 import Parse from 'parse/node';
 import { logger } from './logger';
 
@@ -509,83 +511,135 @@ export function maybeRunQueryTrigger(
     context,
     isGet
   );
-  return Promise.resolve()
-    .then(() => {
-      return maybeRunValidator(requestObject, `${triggerType}.${className}`, auth);
-    })
-    .then(() => {
-      if (requestObject.skipWithMasterKey) {
-        return requestObject.query;
-      }
-      return trigger(requestObject);
-    })
-    .then(
-      result => {
-        let queryResult = parseQuery;
-        if (result && result instanceof Parse.Query) {
-          queryResult = result;
+  return tracePromise(
+    triggerType,
+    className,
+    Promise.resolve()
+      .then(() => {
+        return maybeRunValidator(requestObject, `${triggerType}.${className}`, auth);
+      })
+      .then(() => {
+        if (requestObject.skipWithMasterKey) {
+          return requestObject.query;
         }
-        const jsonQuery = queryResult.toJSON();
-        if (jsonQuery.where) {
-          restWhere = jsonQuery.where;
+        return trigger(requestObject);
+      })
+      .then(
+        result => {
+          let queryResult = parseQuery;
+          if (result && result instanceof Parse.Query) {
+            queryResult = result;
+          }
+          const jsonQuery = queryResult.toJSON();
+          if (jsonQuery.where) {
+            restWhere = jsonQuery.where;
+          }
+          if (jsonQuery.limit) {
+            restOptions = restOptions || {};
+            restOptions.limit = jsonQuery.limit;
+          }
+          if (jsonQuery.skip) {
+            restOptions = restOptions || {};
+            restOptions.skip = jsonQuery.skip;
+          }
+          if (jsonQuery.include) {
+            restOptions = restOptions || {};
+            restOptions.include = jsonQuery.include;
+          }
+          if (jsonQuery.excludeKeys) {
+            restOptions = restOptions || {};
+            restOptions.excludeKeys = jsonQuery.excludeKeys;
+          }
+          if (jsonQuery.explain) {
+            restOptions = restOptions || {};
+            restOptions.explain = jsonQuery.explain;
+          }
+          if (jsonQuery.keys) {
+            restOptions = restOptions || {};
+            restOptions.keys = jsonQuery.keys;
+          }
+          if (jsonQuery.order) {
+            restOptions = restOptions || {};
+            restOptions.order = jsonQuery.order;
+          }
+          if (jsonQuery.hint) {
+            restOptions = restOptions || {};
+            restOptions.hint = jsonQuery.hint;
+          }
+          if (requestObject.readPreference) {
+            restOptions = restOptions || {};
+            restOptions.readPreference = requestObject.readPreference;
+          }
+          return trigger(requestObject);
+        })
+      .then(
+        result => {
+          let queryResult = parseQuery;
+          if (result && result instanceof Parse.Query) {
+            queryResult = result;
+          }
+          const jsonQuery = queryResult.toJSON();
+          if (jsonQuery.where) {
+            restWhere = jsonQuery.where;
+          }
+          if (jsonQuery.limit) {
+            restOptions = restOptions || {};
+            restOptions.limit = jsonQuery.limit;
+          }
+          if (jsonQuery.skip) {
+            restOptions = restOptions || {};
+            restOptions.skip = jsonQuery.skip;
+          }
+          if (jsonQuery.include) {
+            restOptions = restOptions || {};
+            restOptions.include = jsonQuery.include;
+          }
+          if (jsonQuery.excludeKeys) {
+            restOptions = restOptions || {};
+            restOptions.excludeKeys = jsonQuery.excludeKeys;
+          }
+          if (jsonQuery.explain) {
+            restOptions = restOptions || {};
+            restOptions.explain = jsonQuery.explain;
+          }
+          if (jsonQuery.keys) {
+            restOptions = restOptions || {};
+            restOptions.keys = jsonQuery.keys;
+          }
+          if (jsonQuery.order) {
+            restOptions = restOptions || {};
+            restOptions.order = jsonQuery.order;
+          }
+          if (jsonQuery.hint) {
+            restOptions = restOptions || {};
+            restOptions.hint = jsonQuery.hint;
+          }
+          if (requestObject.readPreference) {
+            restOptions = restOptions || {};
+            restOptions.readPreference = requestObject.readPreference;
+          }
+          if (requestObject.includeReadPreference) {
+            restOptions = restOptions || {};
+            restOptions.includeReadPreference = requestObject.includeReadPreference;
+          }
+          if (requestObject.subqueryReadPreference) {
+            restOptions = restOptions || {};
+            restOptions.subqueryReadPreference = requestObject.subqueryReadPreference;
+          }
+          return {
+            restWhere,
+            restOptions,
+          };
+        },
+        err => {
+          const error = resolveError(err, {
+            code: Parse.Error.SCRIPT_FAILED,
+            message: 'Script failed. Unknown error.',
+          });
+          throw error;
         }
-        if (jsonQuery.limit) {
-          restOptions = restOptions || {};
-          restOptions.limit = jsonQuery.limit;
-        }
-        if (jsonQuery.skip) {
-          restOptions = restOptions || {};
-          restOptions.skip = jsonQuery.skip;
-        }
-        if (jsonQuery.include) {
-          restOptions = restOptions || {};
-          restOptions.include = jsonQuery.include;
-        }
-        if (jsonQuery.excludeKeys) {
-          restOptions = restOptions || {};
-          restOptions.excludeKeys = jsonQuery.excludeKeys;
-        }
-        if (jsonQuery.explain) {
-          restOptions = restOptions || {};
-          restOptions.explain = jsonQuery.explain;
-        }
-        if (jsonQuery.keys) {
-          restOptions = restOptions || {};
-          restOptions.keys = jsonQuery.keys;
-        }
-        if (jsonQuery.order) {
-          restOptions = restOptions || {};
-          restOptions.order = jsonQuery.order;
-        }
-        if (jsonQuery.hint) {
-          restOptions = restOptions || {};
-          restOptions.hint = jsonQuery.hint;
-        }
-        if (requestObject.readPreference) {
-          restOptions = restOptions || {};
-          restOptions.readPreference = requestObject.readPreference;
-        }
-        if (requestObject.includeReadPreference) {
-          restOptions = restOptions || {};
-          restOptions.includeReadPreference = requestObject.includeReadPreference;
-        }
-        if (requestObject.subqueryReadPreference) {
-          restOptions = restOptions || {};
-          restOptions.subqueryReadPreference = requestObject.subqueryReadPreference;
-        }
-        return {
-          restWhere,
-          restOptions,
-        };
-      },
-      err => {
-        const error = resolveError(err, {
-          code: Parse.Error.SCRIPT_FAILED,
-          message: 'Script failed. Unknown error.',
-        });
-        throw error;
-      }
-    );
+      )
+  );
 }
 
 export function resolveError(message, defaultOpts) {
@@ -980,4 +1034,32 @@ export async function maybeRunFileTrigger(triggerType, fileObject, config, auth)
     }
   }
   return fileObject;
+}
+
+
+function tracePromise(type, className, promise = Promise.resolve()) {
+  const parent = AWSXRay.getSegment();
+  if (!parent) {
+    return promise;
+  }
+  return new Promise((resolve, reject) => {
+    AWSXRay.captureAsyncFunc(
+      `Parse-Server_triggers_${type}_${className}`,
+      subsegment => {
+        subsegment && subsegment.addAnnotation('Controller', 'triggers');
+        subsegment && subsegment.addAnnotation('Type', type);
+        subsegment && subsegment.addAnnotation('ClassName', className);
+        (promise instanceof Promise ? promise : Promise.resolve(promise)).then(
+          function(result) {
+            resolve(result);
+            subsegment && subsegment.close();
+          },
+          function(error) {
+            reject(error);
+            subsegment && subsegment.close(error);
+          }
+        );
+      }
+    );
+  });
 }
