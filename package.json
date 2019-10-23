@@ -1,6 +1,6 @@
 {
   "name": "parse-server",
-  "version": "5.2.1",
+  "version": "5.2.1-hulab",
   "description": "An express module providing a Parse-compatible API server",
   "main": "lib/index.js",
   "repository": {
@@ -39,6 +39,7 @@
     "graphql-relay": "0.7.0",
     "graphql-tag": "2.12.6",
     "graphql-upload": "11.0.0",
+    "hulab-xray-sdk": "git+https://github.com/hulab/hulab-xray-sdk.git#2.0.0",
     "intersect": "1.0.1",
     "jsonwebtoken": "8.5.1",
     "jwks-rsa": "2.0.5",
@@ -138,9 +139,6 @@
   "bin": {
     "parse-server": "bin/parse-server"
   },
-  "optionalDependencies": {
-    "@node-rs/bcrypt": "1.1.0"
-  },
   "collective": {
     "type": "opencollective",
     "url": "https://opencollective.com/parse-server",
@@ -149,11 +147,6 @@
   "funding": {
     "type": "opencollective",
     "url": "https://opencollective.com/parse-server"
-  },
-  "husky": {
-    "hooks": {
-      "pre-commit": "lint-staged"
-    }
   },
   "lint-staged": {
     "{src,spec}/{**/*,*}.js": [

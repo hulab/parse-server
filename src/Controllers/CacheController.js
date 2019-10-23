@@ -35,7 +35,7 @@ export class SubCache {
   }
 
   clear() {
-    return this.cache.clear();
+    return this.cache.clear(this.prefix);
   }
 }
 
@@ -63,8 +63,9 @@ export class CacheController extends AdaptableController {
     return this.adapter.del(cacheKey);
   }
 
-  clear() {
-    return this.adapter.clear();
+  clear(prefix) {
+    const cachePrefix = prefix ? joinKeys(this.appId, prefix) : undefined;
+    return this.adapter.clear(cachePrefix);
   }
 
   expectedAdapterType() {

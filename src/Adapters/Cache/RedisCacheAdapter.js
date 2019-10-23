@@ -99,15 +99,25 @@ export class RedisCacheAdapter {
     );
   }
 
-  clear() {
+  clear(prefix) {
     debug('clear');
     return this.queue.enqueue(
       FLUSH_DB_KEY,
       () =>
         new Promise(resolve => {
-          this.client.flushdb(function () {
-            resolve();
-          });
+          if (prefix) {
+            this.client.keys(`${prefix}*`, function (err, keys) {
+              if (!err) {
+                this.client.unlink(keys, function () {
+                  resolve();
+                });
+              }
+            });
+          } else {
+            this.client.flushdb(function () {
+              resolve();
+            });
+          }
         })
     );
   }

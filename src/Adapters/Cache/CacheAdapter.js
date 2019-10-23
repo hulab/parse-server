@@ -29,6 +29,7 @@ export class CacheAdapter {
 
   /**
    * Empty a cache
+   * @param {String} prefix Cache key prefix to remove
    */
-  clear() {}
+  clear(prefix) {}
 }
