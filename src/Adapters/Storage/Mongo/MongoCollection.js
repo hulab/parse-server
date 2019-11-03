@@ -1,3 +1,4 @@
+const AWSXRay = require('aws-xray-sdk');
 const mongodb = require('mongodb');
 const Collection = mongodb.Collection;
 
@@ -19,14 +20,17 @@ export default class MongoCollection {
       delete keys.$score;
       keys.score = { $meta: 'textScore' };
     }
-    return this._rawFind(query, {
-      skip,
-      limit,
-      sort,
-      keys,
-      maxTimeMS,
-      readPreference,
-    }).catch(error => {
+    return this._executeWithTrace(
+      'find',
+      this._rawFind(query, {
+        skip,
+        limit,
+        sort,
+        keys,
+        maxTimeMS,
+        readPreference,
+      })
+    ).catch(error => {
       // Check for "no geoindex" error
       if (
         error.code != 17007 &&
@@ -47,14 +51,17 @@ export default class MongoCollection {
           .createIndex(index)
           // Retry, but just once.
           .then(() =>
-            this._rawFind(query, {
-              skip,
-              limit,
-              sort,
-              keys,
-              maxTimeMS,
-              readPreference,
-            })
+            this._executeWithTrace(
+              'find',
+              this._rawFind(query, {
+                skip,
+                limit,
+                sort,
+                keys,
+                maxTimeMS,
+                readPreference,
+              })
+            )
           )
       );
     });
@@ -85,60 +92,90 @@ export default class MongoCollection {
     // which greatly increases execution time when being run on large collections.
     // See https://github.com/Automattic/mongoose/issues/6713 for more info regarding this problem.
     if (typeof query !== 'object' || !Object.keys(query).length) {
-      return this._mongoCollection.estimatedDocumentCount({
-        maxTimeMS,
-      });
+      return this._executeWithTrace(
+        'estimatedDocumentCount',
+        this._mongoCollection.estimatedDocumentCount({
+          maxTimeMS,
+        })
+      );
     }
 
-    const countOperation = this._mongoCollection.countDocuments(query, {
-      skip,
-      limit,
-      sort,
-      maxTimeMS,
-      readPreference,
-    });
+    const countOperation = this._executeWithTrace(
+      'countDocuments',
+      this._mongoCollection.countDocuments(query, {
+        skip,
+        limit,
+        sort,
+        maxTimeMS,
+        readPreference,
+      })
+    );
 
     return countOperation;
   }
 
   distinct(field, query) {
-    return this._mongoCollection.distinct(field, query);
+    return this._executeWithTrace(
+      'distinct',
+      this._mongoCollection.distinct(field, query)
+    );
   }
 
   aggregate(pipeline, { maxTimeMS, readPreference } = {}) {
-    return this._mongoCollection
-      .aggregate(pipeline, { maxTimeMS, readPreference })
-      .toArray();
+    return this._executeWithTrace(
+      'aggregate',
+      this._mongoCollection
+        .aggregate(pipeline, { maxTimeMS, readPreference })
+        .toArray()
+    );
   }
 
   insertOne(object, session) {
-    return this._mongoCollection.insertOne(object, { session });
+    return this._executeWithTrace(
+      'insertOne',
+      this._mongoCollection.insertOne(object, { session })
+    );
   }
 
   insertMany(object, session) {
-    return this._mongoCollection.insertMany(object, { session });
+    return this._executeWithTrace(
+      'insertMany',
+      this._mongoCollection.insertMany(object, { session })
+    );
   }
 
   // Atomically updates data in the database for a single (first) object that matched the query
   // If there is nothing that matches the query - does insert
   // Postgres Note: `INSERT ... ON CONFLICT UPDATE` that is available since 9.5.
   upsertOne(query, update, session) {
-    return this._mongoCollection.updateOne(query, update, {
-      upsert: true,
-      session,
-    });
+    return this._executeWithTrace(
+      'upsertOne',
+      this._mongoCollection.updateOne(query, update, {
+        upsert: true,
+        session,
+      })
+    );
   }
 
   updateOne(query, update) {
-    return this._mongoCollection.updateOne(query, update);
+    return this._executeWithTrace(
+      'updateOne',
+      this._mongoCollection.updateOne(query, update)
+    );
   }
 
   updateMany(query, update, session) {
-    return this._mongoCollection.updateMany(query, update, { session });
+    return this._executeWithTrace(
+      'updateMany',
+      this._mongoCollection.updateMany(query, update, { session })
+    );
   }
 
   deleteMany(query, session) {
-    return this._mongoCollection.deleteMany(query, { session });
+    return this._executeWithTrace(
+      'deleteMany',
+      this._mongoCollection.deleteMany(query, { session })
+    );
   }
 
   _ensureSparseUniqueIndexInBackground(indexRequest) {
@@ -159,5 +196,32 @@ export default class MongoCollection {
 
   drop() {
     return this._mongoCollection.drop();
+  }
+
+  _executeWithTrace(type, fn) {
+    const parent = AWSXRay.getSegment();
+    if (!parent) {
+      return fn;
+    }
+    return new Promise((resolve, reject) => {
+      AWSXRay.captureAsyncFunc('MongoDB', subsegment => {
+        subsegment &&
+          subsegment.addMetadata(
+            'collection',
+            this._mongoCollection.collectionName
+          );
+        subsegment && subsegment.addMetadata('query', type);
+        fn.then(
+          function(result) {
+            resolve(result);
+            subsegment && subsegment.close();
+          },
+          function(error) {
+            reject(error);
+            subsegment && subsegment.close(error);
+          }
+        );
+      });
+    });
   }
 }
