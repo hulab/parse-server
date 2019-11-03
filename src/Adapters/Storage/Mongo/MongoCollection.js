@@ -206,11 +206,11 @@ export default class MongoCollection {
     return new Promise((resolve, reject) => {
       AWSXRay.captureAsyncFunc('MongoDB', subsegment => {
         subsegment &&
-          subsegment.addMetadata(
+          subsegment.addAnnotation(
             'collection',
             this._mongoCollection.collectionName
           );
-        subsegment && subsegment.addMetadata('query', type);
+        subsegment && subsegment.addAnnotation('query', type);
         fn.then(
           function(result) {
             resolve(result);
