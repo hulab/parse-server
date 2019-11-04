@@ -153,7 +153,7 @@ function tracePromise(operation, promise = Promise.resolve()) {
         subsegment &&
           subsegment.addAnnotation('Controller', 'ParseServerRESTController');
         subsegment && subsegment.addAnnotation('Operation', operation);
-        promise.then(
+        (promise instanceof Promise ? promise : Promise.resolve(promise)).then(
           function(result) {
             resolve(result);
             subsegment && subsegment.close();

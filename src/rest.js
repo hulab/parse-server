@@ -305,7 +305,7 @@ function tracePromise(operation, promise = Promise.resolve()) {
     AWSXRay.captureAsyncFunc(`Parse-Server_rest_${operation}`, subsegment => {
       subsegment && subsegment.addAnnotation('Controller', 'rest');
       subsegment && subsegment.addAnnotation('Operation', operation);
-      promise.then(
+      (promise instanceof Promise ? promise : Promise.resolve(promise)).then(
         function(result) {
           resolve(result);
           subsegment && subsegment.close();

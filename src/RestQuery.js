@@ -1074,7 +1074,7 @@ function tracePromise(operation, className, promise = Promise.resolve()) {
         subsegment && subsegment.addAnnotation('Controller', 'RestQuery');
         subsegment && subsegment.addAnnotation('Operation', operation);
         subsegment && subsegment.addAnnotation('ClassName', className);
-        promise.then(
+        (promise instanceof Promise ? promise : Promise.resolve(promise)).then(
           function(result) {
             resolve(result);
             subsegment && subsegment.close();

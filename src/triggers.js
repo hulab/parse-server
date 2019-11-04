@@ -679,7 +679,7 @@ function tracePromise(type, className, promise = Promise.resolve()) {
         subsegment && subsegment.addAnnotation('Controller', 'triggers');
         subsegment && subsegment.addAnnotation('Type', type);
         subsegment && subsegment.addAnnotation('ClassName', className);
-        promise.then(
+        (promise instanceof Promise ? promise : Promise.resolve(promise)).then(
           function(result) {
             resolve(result);
             subsegment && subsegment.close();

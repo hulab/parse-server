@@ -1360,10 +1360,10 @@ class DatabaseController {
           return (isMaster
             ? Promise.resolve()
             : tracePromise(
-                'validatePermission',
-                className,
-                schemaController.validatePermission(className, aclGroup, op)
-              )
+              'validatePermission',
+              className,
+              schemaController.validatePermission(className, aclGroup, op)
+            )
           )
             .then(() =>
               tracePromise(
@@ -1726,7 +1726,7 @@ function tracePromise(operation, className, promise = Promise.resolve()) {
         subsegment && subsegment.addAnnotation('Operation', operation);
         className & subsegment &&
           subsegment.addAnnotation('ClassName', className);
-        promise.then(
+        (promise instanceof Promise ? promise : Promise.resolve(promise)).then(
           function(result) {
             resolve(result);
             subsegment && subsegment.close();
