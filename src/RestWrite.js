@@ -89,74 +89,124 @@ function RestWrite(
 RestWrite.prototype.execute = function() {
   return Promise.resolve()
     .then(() => {
-      return tracePromise('getUserAndRoleACL', this.getUserAndRoleACL());
+      return tracePromise(
+        'getUserAndRoleACL',
+        this.className,
+        this.getUserAndRoleACL()
+      );
     })
     .then(() => {
       return tracePromise(
         'validateClientClassCreation',
+        this.className,
         this.validateClientClassCreation()
       );
     })
     .then(() => {
-      return tracePromise('handleInstallation', this.handleInstallation());
+      return tracePromise(
+        'handleInstallation',
+        this.className,
+        this.handleInstallation()
+      );
     })
     .then(() => {
-      return tracePromise('handleSession', this.handleSession());
+      return tracePromise(
+        'handleSession',
+        this.className,
+        this.handleSession()
+      );
     })
     .then(() => {
-      return tracePromise('validateAuthData', this.validateAuthData());
+      return tracePromise(
+        'validateAuthData',
+        this.className,
+        this.validateAuthData()
+      );
     })
     .then(() => {
-      return tracePromise('runBeforeSaveTrigger', this.runBeforeSaveTrigger());
+      return tracePromise(
+        'runBeforeSaveTrigger',
+        this.className,
+        this.runBeforeSaveTrigger()
+      );
     })
     .then(() => {
       return tracePromise(
         'deleteEmailResetTokenIfNeeded',
+        this.className,
         this.deleteEmailResetTokenIfNeeded()
       );
     })
     .then(() => {
-      return tracePromise('validateSchema', this.validateSchema());
+      return tracePromise(
+        'validateSchema',
+        this.className,
+        this.validateSchema()
+      );
     })
     .then(schemaController => {
       this.validSchemaController = schemaController;
       return tracePromise(
         'setRequiredFieldsIfNeeded',
+        this.className,
         this.setRequiredFieldsIfNeeded()
       );
     })
     .then(() => {
-      return tracePromise('transformUser', this.transformUser());
+      return tracePromise(
+        'transformUser',
+        this.className,
+        this.transformUser()
+      );
     })
     .then(() => {
       return tracePromise(
         'expandFilesForExistingObjects',
+        this.className,
         this.expandFilesForExistingObjects()
       );
     })
     .then(() => {
       return tracePromise(
         'destroyDuplicatedSessions',
+        this.className,
         this.destroyDuplicatedSessions()
       );
     })
     .then(() => {
-      return tracePromise('runDatabaseOperation', this.runDatabaseOperation());
+      return tracePromise(
+        'runDatabaseOperation',
+        this.className,
+        this.runDatabaseOperation()
+      );
     })
     .then(() => {
       return tracePromise(
         'createSessionTokenIfNeeded',
+        this.className,
         this.createSessionTokenIfNeeded()
       );
     })
     .then(() => {
-      return tracePromise('handleFollowup', this.handleFollowup());
+      return tracePromise(
+        'handleFollowup',
+        this.className,
+        this.handleFollowup()
+      );
     })
     .then(() => {
-      return tracePromise('runAfterSaveTrigger', this.runAfterSaveTrigger());
+      return tracePromise(
+        'runAfterSaveTrigger',
+        this.className,
+        this.runAfterSaveTrigger()
+      );
     })
     .then(() => {
-      return tracePromise('cleanUserAuthData', this.cleanUserAuthData());
+      return tracePromise(
+        'cleanUserAuthData',
+        this.className,
+        this.cleanUserAuthData()
+      );
     })
     .then(() => {
       return this.response;
@@ -1745,7 +1795,7 @@ RestWrite.prototype._updateResponseWithData = function(response, data) {
   return response;
 };
 
-function tracePromise(operation, promise = Promise.resolve()) {
+function tracePromise(operation, className, promise = Promise.resolve()) {
   const parent = AWSXRay.getSegment();
   if (!parent) {
     return promise;
@@ -1754,6 +1804,8 @@ function tracePromise(operation, promise = Promise.resolve()) {
     AWSXRay.captureAsyncFunc('Parse-Server', subsegment => {
       subsegment && subsegment.addAnnotation('Controller', 'RestWrite');
       subsegment && subsegment.addAnnotation('Operation', operation);
+      className & subsegment &&
+        subsegment.addAnnotation('ClassName', className);
       promise.then(
         function(result) {
           resolve(result);

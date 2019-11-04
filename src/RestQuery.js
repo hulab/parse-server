@@ -188,25 +188,49 @@ function RestQuery(
 RestQuery.prototype.execute = function(executeOptions) {
   return Promise.resolve()
     .then(() => {
-      return tracePromise('buildRestWhere', this.buildRestWhere());
+      return tracePromise(
+        'buildRestWhere',
+        this.className,
+        this.buildRestWhere()
+      );
     })
     .then(() => {
-      return tracePromise('handleIncludeAll', this.handleIncludeAll());
+      return tracePromise(
+        'handleIncludeAll',
+        this.className,
+        this.handleIncludeAll()
+      );
     })
     .then(() => {
-      return tracePromise('handleExcludeKeys', this.handleExcludeKeys());
+      return tracePromise(
+        'handleExcludeKeys',
+        this.className,
+        this.handleExcludeKeys()
+      );
     })
     .then(() => {
-      return tracePromise('runFind', this.runFind(executeOptions));
+      return tracePromise(
+        'runFind',
+        this.className,
+        this.runFind(executeOptions)
+      );
     })
     .then(() => {
-      return tracePromise('runCount', this.runCount());
+      return tracePromise('runCount', this.className, this.runCount());
     })
     .then(() => {
-      return tracePromise('handleInclude', this.handleInclude());
+      return tracePromise(
+        'handleInclude',
+        this.className,
+        this.handleInclude()
+      );
     })
     .then(() => {
-      return tracePromise('runAfterFindTrigger', this.runAfterFindTrigger());
+      return tracePromise(
+        'runAfterFindTrigger',
+        this.className,
+        this.runAfterFindTrigger()
+      );
     })
     .then(() => {
       return this.response;
@@ -1006,7 +1030,7 @@ function findObjectWithKey(root, key) {
   }
 }
 
-function tracePromise(operation, promise = Promise.resolve()) {
+function tracePromise(operation, className, promise = Promise.resolve()) {
   const parent = AWSXRay.getSegment();
   if (!parent) {
     return promise;
@@ -1015,6 +1039,7 @@ function tracePromise(operation, promise = Promise.resolve()) {
     AWSXRay.captureAsyncFunc('Parse-Server', subsegment => {
       subsegment && subsegment.addAnnotation('Controller', 'RestQuery');
       subsegment && subsegment.addAnnotation('Operation', operation);
+      subsegment && subsegment.addAnnotation('ClassName', className);
       promise.then(
         function(result) {
           resolve(result);
