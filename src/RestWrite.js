@@ -1,6 +1,7 @@
 // A RestWrite encapsulates everything we need to run an operation
 // that writes to the database.
 // This could be either a "create" or an "update".
+const AWSXRay = require('aws-xray-sdk');
 
 var SchemaController = require('./Controllers/SchemaController');
 var deepcopy = require('deepcopy');
@@ -88,56 +89,74 @@ function RestWrite(
 RestWrite.prototype.execute = function() {
   return Promise.resolve()
     .then(() => {
-      return this.getUserAndRoleACL();
+      return tracePromise('getUserAndRoleACL', this.getUserAndRoleACL());
     })
     .then(() => {
-      return this.validateClientClassCreation();
+      return tracePromise(
+        'validateClientClassCreation',
+        this.validateClientClassCreation()
+      );
     })
     .then(() => {
-      return this.handleInstallation();
+      return tracePromise('handleInstallation', this.handleInstallation());
     })
     .then(() => {
-      return this.handleSession();
+      return tracePromise('handleSession', this.handleSession());
     })
     .then(() => {
-      return this.validateAuthData();
+      return tracePromise('validateAuthData', this.validateAuthData());
     })
     .then(() => {
-      return this.runBeforeSaveTrigger();
+      return tracePromise('runBeforeSaveTrigger', this.runBeforeSaveTrigger());
     })
     .then(() => {
-      return this.deleteEmailResetTokenIfNeeded();
+      return tracePromise(
+        'deleteEmailResetTokenIfNeeded',
+        this.deleteEmailResetTokenIfNeeded()
+      );
     })
     .then(() => {
-      return this.validateSchema();
+      return tracePromise('validateSchema', this.validateSchema());
     })
     .then(schemaController => {
       this.validSchemaController = schemaController;
-      return this.setRequiredFieldsIfNeeded();
+      return tracePromise(
+        'setRequiredFieldsIfNeeded',
+        this.setRequiredFieldsIfNeeded()
+      );
     })
     .then(() => {
-      return this.transformUser();
+      return tracePromise('transformUser', this.transformUser());
     })
     .then(() => {
-      return this.expandFilesForExistingObjects();
+      return tracePromise(
+        'expandFilesForExistingObjects',
+        this.expandFilesForExistingObjects()
+      );
     })
     .then(() => {
-      return this.destroyDuplicatedSessions();
+      return tracePromise(
+        'destroyDuplicatedSessions',
+        this.destroyDuplicatedSessions()
+      );
     })
     .then(() => {
-      return this.runDatabaseOperation();
+      return tracePromise('runDatabaseOperation', this.runDatabaseOperation());
     })
     .then(() => {
-      return this.createSessionTokenIfNeeded();
+      return tracePromise(
+        'createSessionTokenIfNeeded',
+        this.createSessionTokenIfNeeded()
+      );
     })
     .then(() => {
-      return this.handleFollowup();
+      return tracePromise('handleFollowup', this.handleFollowup());
     })
     .then(() => {
-      return this.runAfterSaveTrigger();
+      return tracePromise('runAfterSaveTrigger', this.runAfterSaveTrigger());
     })
     .then(() => {
-      return this.cleanUserAuthData();
+      return tracePromise('cleanUserAuthData', this.cleanUserAuthData());
     })
     .then(() => {
       return this.response;
@@ -1725,6 +1744,29 @@ RestWrite.prototype._updateResponseWithData = function(response, data) {
   });
   return response;
 };
+
+function tracePromise(operation, promise) {
+  const parent = AWSXRay.getSegment();
+  if (!parent) {
+    return promise;
+  }
+  return new Promise((resolve, reject) => {
+    AWSXRay.captureAsyncFunc('Parse-Server', subsegment => {
+      subsegment && subsegment.addAnnotation('Controller', 'RestWrite');
+      subsegment && subsegment.addAnnotation('Operation', operation);
+      promise.then(
+        function(result) {
+          resolve(result);
+          subsegment && subsegment.close();
+        },
+        function(error) {
+          reject(error);
+          subsegment && subsegment.close(error);
+        }
+      );
+    });
+  });
+}
 
 export default RestWrite;
 module.exports = RestWrite;

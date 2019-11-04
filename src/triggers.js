@@ -1,4 +1,6 @@
 // triggers.js
+const AWSXRay = require('aws-xray-sdk');
+
 import Parse from 'parse/node';
 import { logger } from './logger';
 
@@ -405,23 +407,27 @@ export function maybeRunAfterFindTrigger(
       object.className = className;
       return Parse.Object.fromJSON(object);
     });
-    return Promise.resolve()
-      .then(() => {
-        const response = trigger(request);
-        if (response && typeof response.then === 'function') {
-          return response.then(results => {
-            if (!results) {
-              throw new Parse.Error(
-                Parse.Error.SCRIPT_FAILED,
-                'AfterFind expect results to be returned in the promise'
-              );
-            }
-            return results;
-          });
-        }
-        return response;
-      })
-      .then(success, error);
+    return tracePromise(
+      triggerType,
+      className,
+      Promise.resolve()
+        .then(() => {
+          const response = trigger(request);
+          if (response && typeof response.then === 'function') {
+            return response.then(results => {
+              if (!results) {
+                throw new Parse.Error(
+                  Parse.Error.SCRIPT_FAILED,
+                  'AfterFind expect results to be returned in the promise'
+                );
+              }
+              return results;
+            });
+          }
+          return response;
+        })
+        .then(success, error)
+    );
   }).then(results => {
     logTriggerAfterHook(triggerType, className, JSON.stringify(results), auth);
     return results;
@@ -470,67 +476,71 @@ export function maybeRunQueryTrigger(
     config,
     isGet
   );
-  return Promise.resolve()
-    .then(() => {
-      return trigger(requestObject);
-    })
-    .then(
-      result => {
-        let queryResult = parseQuery;
-        if (result && result instanceof Parse.Query) {
-          queryResult = result;
+  return tracePromise(
+    triggerType,
+    className,
+    Promise.resolve()
+      .then(() => {
+        return trigger(requestObject);
+      })
+      .then(
+        result => {
+          let queryResult = parseQuery;
+          if (result && result instanceof Parse.Query) {
+            queryResult = result;
+          }
+          const jsonQuery = queryResult.toJSON();
+          if (jsonQuery.where) {
+            restWhere = jsonQuery.where;
+          }
+          if (jsonQuery.limit) {
+            restOptions = restOptions || {};
+            restOptions.limit = jsonQuery.limit;
+          }
+          if (jsonQuery.skip) {
+            restOptions = restOptions || {};
+            restOptions.skip = jsonQuery.skip;
+          }
+          if (jsonQuery.include) {
+            restOptions = restOptions || {};
+            restOptions.include = jsonQuery.include;
+          }
+          if (jsonQuery.keys) {
+            restOptions = restOptions || {};
+            restOptions.keys = jsonQuery.keys;
+          }
+          if (jsonQuery.order) {
+            restOptions = restOptions || {};
+            restOptions.order = jsonQuery.order;
+          }
+          if (requestObject.readPreference) {
+            restOptions = restOptions || {};
+            restOptions.readPreference = requestObject.readPreference;
+          }
+          if (requestObject.includeReadPreference) {
+            restOptions = restOptions || {};
+            restOptions.includeReadPreference =
+              requestObject.includeReadPreference;
+          }
+          if (requestObject.subqueryReadPreference) {
+            restOptions = restOptions || {};
+            restOptions.subqueryReadPreference =
+              requestObject.subqueryReadPreference;
+          }
+          return {
+            restWhere,
+            restOptions,
+          };
+        },
+        err => {
+          if (typeof err === 'string') {
+            throw new Parse.Error(1, err);
+          } else {
+            throw err;
+          }
         }
-        const jsonQuery = queryResult.toJSON();
-        if (jsonQuery.where) {
-          restWhere = jsonQuery.where;
-        }
-        if (jsonQuery.limit) {
-          restOptions = restOptions || {};
-          restOptions.limit = jsonQuery.limit;
-        }
-        if (jsonQuery.skip) {
-          restOptions = restOptions || {};
-          restOptions.skip = jsonQuery.skip;
-        }
-        if (jsonQuery.include) {
-          restOptions = restOptions || {};
-          restOptions.include = jsonQuery.include;
-        }
-        if (jsonQuery.keys) {
-          restOptions = restOptions || {};
-          restOptions.keys = jsonQuery.keys;
-        }
-        if (jsonQuery.order) {
-          restOptions = restOptions || {};
-          restOptions.order = jsonQuery.order;
-        }
-        if (requestObject.readPreference) {
-          restOptions = restOptions || {};
-          restOptions.readPreference = requestObject.readPreference;
-        }
-        if (requestObject.includeReadPreference) {
-          restOptions = restOptions || {};
-          restOptions.includeReadPreference =
-            requestObject.includeReadPreference;
-        }
-        if (requestObject.subqueryReadPreference) {
-          restOptions = restOptions || {};
-          restOptions.subqueryReadPreference =
-            requestObject.subqueryReadPreference;
-        }
-        return {
-          restWhere,
-          restOptions,
-        };
-      },
-      err => {
-        if (typeof err === 'string') {
-          throw new Parse.Error(1, err);
-        } else {
-          throw err;
-        }
-      }
-    );
+      )
+  );
 }
 
 // To be used as part of the promise chain when saving/deleting an object
@@ -655,4 +665,28 @@ export function runLiveQueryEventHandlers(
     return;
   }
   _triggerStore[applicationId].LiveQuery.forEach(handler => handler(data));
+}
+
+function tracePromise(type, className, promise) {
+  const parent = AWSXRay.getSegment();
+  if (!parent) {
+    return promise;
+  }
+  return new Promise((resolve, reject) => {
+    AWSXRay.captureAsyncFunc('Parse-Server', subsegment => {
+      subsegment && subsegment.addAnnotation('Controller', 'triggers');
+      subsegment && subsegment.addAnnotation('Type', type);
+      subsegment && subsegment.addAnnotation('ClassName', className);
+      promise.then(
+        function(result) {
+          resolve(result);
+          subsegment && subsegment.close();
+        },
+        function(error) {
+          reject(error);
+          subsegment && subsegment.close(error);
+        }
+      );
+    });
+  });
 }

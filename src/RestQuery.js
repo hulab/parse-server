@@ -1,5 +1,6 @@
 // An object that encapsulates everything we need to run a 'find'
 // operation, encoded in the REST API format.
+const AWSXRay = require('aws-xray-sdk');
 
 var SchemaController = require('./Controllers/SchemaController');
 var Parse = require('parse/node').Parse;
@@ -187,25 +188,25 @@ function RestQuery(
 RestQuery.prototype.execute = function(executeOptions) {
   return Promise.resolve()
     .then(() => {
-      return this.buildRestWhere();
+      return tracePromise('buildRestWhere', this.buildRestWhere());
     })
     .then(() => {
-      return this.handleIncludeAll();
+      return tracePromise('handleIncludeAll', this.handleIncludeAll());
     })
     .then(() => {
-      return this.handleExcludeKeys();
+      return tracePromise('handleExcludeKeys', this.handleExcludeKeys());
     })
     .then(() => {
-      return this.runFind(executeOptions);
+      return tracePromise('runFind', this.runFind(executeOptions));
     })
     .then(() => {
-      return this.runCount();
+      return tracePromise('runCount', this.runCount());
     })
     .then(() => {
-      return this.handleInclude();
+      return tracePromise('handleInclude', this.handleInclude());
     })
     .then(() => {
-      return this.runAfterFindTrigger();
+      return tracePromise('runAfterFindTrigger', this.runAfterFindTrigger());
     })
     .then(() => {
       return this.response;
@@ -1003,6 +1004,29 @@ function findObjectWithKey(root, key) {
       return answer;
     }
   }
+}
+
+function tracePromise(operation, promise) {
+  const parent = AWSXRay.getSegment();
+  if (!parent) {
+    return promise;
+  }
+  return new Promise((resolve, reject) => {
+    AWSXRay.captureAsyncFunc('Parse-Server', subsegment => {
+      subsegment && subsegment.addAnnotation('Controller', 'RestQuery');
+      subsegment && subsegment.addAnnotation('Operation', operation);
+      promise.then(
+        function(result) {
+          resolve(result);
+          subsegment && subsegment.close();
+        },
+        function(error) {
+          reject(error);
+          subsegment && subsegment.close(error);
+        }
+      );
+    });
+  });
 }
 
 module.exports = RestQuery;
