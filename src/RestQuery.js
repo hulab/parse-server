@@ -272,28 +272,60 @@ RestQuery.prototype.each = function(callback) {
 RestQuery.prototype.buildRestWhere = function() {
   return Promise.resolve()
     .then(() => {
-      return this.getUserAndRoleACL();
+      return tracePromise(
+        'getUserAndRoleACL',
+        this.className,
+        this.getUserAndRoleACL()
+      );
     })
     .then(() => {
-      return this.redirectClassNameForKey();
+      return tracePromise(
+        'redirectClassNameForKey',
+        this.className,
+        this.redirectClassNameForKey()
+      );
     })
     .then(() => {
-      return this.validateClientClassCreation();
+      return tracePromise(
+        'validateClientClassCreation',
+        this.className,
+        this.validateClientClassCreation()
+      );
     })
     .then(() => {
-      return this.replaceSelect();
+      return tracePromise(
+        'replaceSelect',
+        this.className,
+        this.replaceSelect()
+      );
     })
     .then(() => {
-      return this.replaceDontSelect();
+      return tracePromise(
+        'replaceDontSelect',
+        this.className,
+        this.replaceDontSelect()
+      );
     })
     .then(() => {
-      return this.replaceInQuery();
+      return tracePromise(
+        'replaceInQuery',
+        this.className,
+        this.replaceInQuery()
+      );
     })
     .then(() => {
-      return this.replaceNotInQuery();
+      return tracePromise(
+        'replaceNotInQuery',
+        this.className,
+        this.replaceNotInQuery()
+      );
     })
     .then(() => {
-      return this.replaceEquality();
+      return tracePromise(
+        'replaceEquality',
+        this.className,
+        this.replaceEquality()
+      );
     });
 };
 
@@ -1036,21 +1068,24 @@ function tracePromise(operation, className, promise = Promise.resolve()) {
     return promise;
   }
   return new Promise((resolve, reject) => {
-    AWSXRay.captureAsyncFunc('Parse-Server', subsegment => {
-      subsegment && subsegment.addAnnotation('Controller', 'RestQuery');
-      subsegment && subsegment.addAnnotation('Operation', operation);
-      subsegment && subsegment.addAnnotation('ClassName', className);
-      promise.then(
-        function(result) {
-          resolve(result);
-          subsegment && subsegment.close();
-        },
-        function(error) {
-          reject(error);
-          subsegment && subsegment.close(error);
-        }
-      );
-    });
+    AWSXRay.captureAsyncFunc(
+      `Parse-Server_RestQuery_${operation}_${className}`,
+      subsegment => {
+        subsegment && subsegment.addAnnotation('Controller', 'RestQuery');
+        subsegment && subsegment.addAnnotation('Operation', operation);
+        subsegment && subsegment.addAnnotation('ClassName', className);
+        promise.then(
+          function(result) {
+            resolve(result);
+            subsegment && subsegment.close();
+          },
+          function(error) {
+            reject(error);
+            subsegment && subsegment.close(error);
+          }
+        );
+      }
+    );
   });
 }
 

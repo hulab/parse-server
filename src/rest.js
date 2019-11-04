@@ -302,7 +302,7 @@ function tracePromise(operation, promise = Promise.resolve()) {
     return promise;
   }
   return new Promise((resolve, reject) => {
-    AWSXRay.captureAsyncFunc('Parse-Server', subsegment => {
+    AWSXRay.captureAsyncFunc(`Parse-Server_rest_${operation}`, subsegment => {
       subsegment && subsegment.addAnnotation('Controller', 'rest');
       subsegment && subsegment.addAnnotation('Operation', operation);
       promise.then(

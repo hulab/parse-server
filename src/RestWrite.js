@@ -1801,22 +1801,25 @@ function tracePromise(operation, className, promise = Promise.resolve()) {
     return promise;
   }
   return new Promise((resolve, reject) => {
-    AWSXRay.captureAsyncFunc('Parse-Server', subsegment => {
-      subsegment && subsegment.addAnnotation('Controller', 'RestWrite');
-      subsegment && subsegment.addAnnotation('Operation', operation);
-      className & subsegment &&
-        subsegment.addAnnotation('ClassName', className);
-      promise.then(
-        function(result) {
-          resolve(result);
-          subsegment && subsegment.close();
-        },
-        function(error) {
-          reject(error);
-          subsegment && subsegment.close(error);
-        }
-      );
-    });
+    AWSXRay.captureAsyncFunc(
+      `Parse-Server_RestWrite_${operation}_${className}`,
+      subsegment => {
+        subsegment && subsegment.addAnnotation('Controller', 'RestWrite');
+        subsegment && subsegment.addAnnotation('Operation', operation);
+        className & subsegment &&
+          subsegment.addAnnotation('ClassName', className);
+        promise.then(
+          function(result) {
+            resolve(result);
+            subsegment && subsegment.close();
+          },
+          function(error) {
+            reject(error);
+            subsegment && subsegment.close(error);
+          }
+        );
+      }
+    );
   });
 }
 

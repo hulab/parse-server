@@ -673,20 +673,23 @@ function tracePromise(type, className, promise = Promise.resolve()) {
     return promise;
   }
   return new Promise((resolve, reject) => {
-    AWSXRay.captureAsyncFunc('Parse-Server', subsegment => {
-      subsegment && subsegment.addAnnotation('Controller', 'triggers');
-      subsegment && subsegment.addAnnotation('Type', type);
-      subsegment && subsegment.addAnnotation('ClassName', className);
-      promise.then(
-        function(result) {
-          resolve(result);
-          subsegment && subsegment.close();
-        },
-        function(error) {
-          reject(error);
-          subsegment && subsegment.close(error);
-        }
-      );
-    });
+    AWSXRay.captureAsyncFunc(
+      `Parse-Server_triggers_${type}_${className}`,
+      subsegment => {
+        subsegment && subsegment.addAnnotation('Controller', 'triggers');
+        subsegment && subsegment.addAnnotation('Type', type);
+        subsegment && subsegment.addAnnotation('ClassName', className);
+        promise.then(
+          function(result) {
+            resolve(result);
+            subsegment && subsegment.close();
+          },
+          function(error) {
+            reject(error);
+            subsegment && subsegment.close(error);
+          }
+        );
+      }
+    );
   });
 }

@@ -147,21 +147,24 @@ function tracePromise(operation, promise = Promise.resolve()) {
     return promise;
   }
   return new Promise((resolve, reject) => {
-    AWSXRay.captureAsyncFunc('Parse-Server', subsegment => {
-      subsegment &&
-        subsegment.addAnnotation('Controller', 'ParseServerRESTController');
-      subsegment && subsegment.addAnnotation('Operation', operation);
-      promise.then(
-        function(result) {
-          resolve(result);
-          subsegment && subsegment.close();
-        },
-        function(error) {
-          reject(error);
-          subsegment && subsegment.close(error);
-        }
-      );
-    });
+    AWSXRay.captureAsyncFunc(
+      `Parse-Server_RESTController_${operation}`,
+      subsegment => {
+        subsegment &&
+          subsegment.addAnnotation('Controller', 'ParseServerRESTController');
+        subsegment && subsegment.addAnnotation('Operation', operation);
+        promise.then(
+          function(result) {
+            resolve(result);
+            subsegment && subsegment.close();
+          },
+          function(error) {
+            reject(error);
+            subsegment && subsegment.close(error);
+          }
+        );
+      }
+    );
   });
 }
 
