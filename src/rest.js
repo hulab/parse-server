@@ -296,7 +296,7 @@ function enforceRoleSecurity(method, className, auth) {
   }
 }
 
-function tracePromise(operation, promise) {
+function tracePromise(operation, promise = Promise.resolve()) {
   const parent = AWSXRay.getSegment();
   if (!parent) {
     return promise;

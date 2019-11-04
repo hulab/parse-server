@@ -667,7 +667,7 @@ export function runLiveQueryEventHandlers(
   _triggerStore[applicationId].LiveQuery.forEach(handler => handler(data));
 }
 
-function tracePromise(type, className, promise) {
+function tracePromise(type, className, promise = Promise.resolve()) {
   const parent = AWSXRay.getSegment();
   if (!parent) {
     return promise;

@@ -1745,7 +1745,7 @@ RestWrite.prototype._updateResponseWithData = function(response, data) {
   return response;
 };
 
-function tracePromise(operation, promise) {
+function tracePromise(operation, promise = Promise.resolve()) {
   const parent = AWSXRay.getSegment();
   if (!parent) {
     return promise;
