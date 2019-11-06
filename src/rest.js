@@ -6,7 +6,7 @@
 // This means that one of these handlers can support multiple
 // routes. That's useful for the routes that do really similar
 // things.
-const AWSXRay = require('aws-xray-sdk');
+const AWSXRay = require('hulab-xray-sdk');
 
 var Parse = require('parse/node').Parse;
 

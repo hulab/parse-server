@@ -1,4 +1,4 @@
-const AWSXRay = require('aws-xray-sdk');
+const AWSXRay = require('hulab-xray-sdk');
 const Config = require('./Config');
 const Auth = require('./Auth');
 const RESTController = require('parse/lib/node/RESTController');

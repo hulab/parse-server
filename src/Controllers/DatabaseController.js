@@ -18,7 +18,7 @@ import type {
   FullQueryOptions,
 } from '../Adapters/Storage/StorageAdapter';
 
-import AWSXRay from 'aws-xray-sdk';
+import AWSXRay from 'hulab-xray-sdk';
 
 function addWriteACL(query, acl) {
   const newQuery = _.cloneDeep(query);

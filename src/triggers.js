@@ -1,5 +1,5 @@
 // triggers.js
-const AWSXRay = require('aws-xray-sdk');
+const AWSXRay = require('hulab-xray-sdk');
 
 import Parse from 'parse/node';
 import { logger } from './logger';

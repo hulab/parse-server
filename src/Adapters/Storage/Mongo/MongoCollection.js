@@ -1,4 +1,4 @@
-const AWSXRay = require('aws-xray-sdk');
+const AWSXRay = require('hulab-xray-sdk');
 const mongodb = require('mongodb');
 const Collection = mongodb.Collection;
 

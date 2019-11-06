@@ -1,7 +1,7 @@
 // A RestWrite encapsulates everything we need to run an operation
 // that writes to the database.
 // This could be either a "create" or an "update".
-const AWSXRay = require('aws-xray-sdk');
+const AWSXRay = require('hulab-xray-sdk');
 
 var SchemaController = require('./Controllers/SchemaController');
 var deepcopy = require('deepcopy');

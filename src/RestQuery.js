@@ -1,6 +1,6 @@
 // An object that encapsulates everything we need to run a 'find'
 // operation, encoded in the REST API format.
-const AWSXRay = require('aws-xray-sdk');
+const AWSXRay = require('hulab-xray-sdk');
 
 var SchemaController = require('./Controllers/SchemaController');
 var Parse = require('parse/node').Parse;
