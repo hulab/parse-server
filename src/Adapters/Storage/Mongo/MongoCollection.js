@@ -29,7 +29,7 @@ export default class MongoCollection {
         keys,
         maxTimeMS,
         readPreference,
-      })
+      }), query
     ).catch(error => {
       // Check for "no geoindex" error
       if (
@@ -198,19 +198,22 @@ export default class MongoCollection {
     return this._mongoCollection.drop();
   }
 
-  _executeWithTrace(type, fn) {
+  _executeWithTrace(type, fn, query) {
     const parent = AWSXRay.getSegment();
     if (!parent) {
       return fn;
     }
     return new Promise((resolve, reject) => {
-      AWSXRay.captureAsyncFunc('MongoDB', subsegment => {
-        subsegment &&
-          subsegment.addAnnotation(
-            'collection',
-            this._mongoCollection.collectionName
-          );
-        subsegment && subsegment.addAnnotation('query', type);
+      AWSXRay.captureAsyncFunc(`MongoDB_${this._mongoCollection.collectionName}`, subsegment => {
+        try {
+          subsegment && subsegment.addAnnotation('collection', this._mongoCollection.collectionName);
+          subsegment && subsegment.addAnnotation('query', type);
+          if (query && typeof query === "object") {
+            subsegment && subsegment.addAnnotation('where', JSON.stringify(query));
+          }
+        } catch (error) {
+          //
+        }
         fn.then(
           function(result) {
             resolve(result);
