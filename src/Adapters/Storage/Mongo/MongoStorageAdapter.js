@@ -883,6 +883,8 @@ export class MongoStorageAdapter implements StorageAdapter {
       return null;
     } else if (Array.isArray(pipeline)) {
       return pipeline.map(value => this._parseAggregateArgs(schema, value));
+    } else if (pipeline instanceof Date) {
+      return pipeline;
     } else if (typeof pipeline === 'object') {
       const returnValue = {};
       for (const field in pipeline) {
@@ -900,6 +902,8 @@ export class MongoStorageAdapter implements StorageAdapter {
           schema.fields[field].type === 'Date'
         ) {
           returnValue[field] = this._convertToDate(pipeline[field]);
+        } else if (pipeline[field] && pipeline[field].__type === "Date") {
+          returnValue[field] = this._convertToDate(pipeline[field].iso);
         } else {
           returnValue[field] = this._parseAggregateArgs(
             schema,
