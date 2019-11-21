@@ -28,6 +28,9 @@ const anonymous = {
   validateAppId: () => {
     return Promise.resolve();
   },
+  equalAuthData: (authData, newAuthData) => {
+    return authData.id === newAuthData.id;
+  }
 };
 
 const providers = {
@@ -90,7 +93,7 @@ function loadAuthAdapter(provider, authOptions) {
       providerOptions
     );
     if (optionalAdapter) {
-      ['validateAuthData', 'validateAppId'].forEach(key => {
+      ['validateAuthData', 'validateAppId', 'equalAuthData'].forEach(key => {
         if (optionalAdapter[key]) {
           adapter[key] = optionalAdapter[key];
         }
@@ -128,9 +131,23 @@ module.exports = function(authOptions = {}, enableAnonymousUsers = true) {
     return authDataValidator(adapter, appIds, providerOptions);
   };
 
+  const getEqualityForProvider = function(provider) {
+    if (provider === 'anonymous' && !_enableAnonymousUsers) {
+      return;
+    }
+
+    const { adapter} = loadAuthAdapter(
+      provider,
+      authOptions
+    );
+
+    return adapter.equalAuthData;
+  }
+
   return Object.freeze({
     getValidatorForProvider,
     setEnableAnonymousUsers,
+    getEqualityForProvider
   });
 };
 

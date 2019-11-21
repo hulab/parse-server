@@ -61,6 +61,12 @@ function validateAppId(appIds, authData, options) {
   });
 }
 
+function equalAuthData(authData, newAuthData) {
+  return (authData.id === newAuthData.id
+    && authData.accesss_token === newAuthData.accesss_token
+    && new Date(authData.expiration_date).getTime() === new Date(newAuthData.expiration_date).getTime());
+}
+
 // A promisey wrapper for FB graph requests.
 function graphRequest(path) {
   return httpsRequest.get('https://graph.facebook.com/' + path);
@@ -69,4 +75,5 @@ function graphRequest(path) {
 module.exports = {
   validateAppId: validateAppId,
   validateAuthData: validateAuthData,
+  equalAuthData: equalAuthData
 };

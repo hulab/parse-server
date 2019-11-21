@@ -578,7 +578,10 @@ RestWrite.prototype.handleAuthData = function(authData) {
       Object.keys(authData).forEach(provider => {
         const providerData = authData[provider];
         const userAuthData = userResult.authData[provider];
-        if (!_.isEqual(providerData, userAuthData)) {
+
+        const equalAuthData = this.config.authDataManager.getEqualityForProvider(provider) || _.isEqual;
+
+        if (!equalAuthData(providerData, userAuthData)) {
           mutatedAuthData[provider] = providerData;
         }
       });
