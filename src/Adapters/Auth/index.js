@@ -29,7 +29,7 @@ const anonymous = {
     return Promise.resolve();
   },
   equalAuthData: (authData, newAuthData) => {
-    return authData.id === newAuthData.id;
+    return (authData && authData.id) == (newAuthData && newAuthData.id);
   }
 };
 
