@@ -1,6 +1,6 @@
 {
   "name": "parse-server",
-  "version": "3.9.0-hulab-12",
+  "version": "3.9.0-hulab-13",
   "description": "An express module providing a Parse-compatible API server",
   "main": "lib/index.js",
   "repository": {
@@ -42,7 +42,7 @@
     "lodash": "4.17.15",
     "lru-cache": "5.1.1",
     "mime": "2.4.4",
-    "mongodb": "3.3.2",
+    "mongodb": "3.4.1",
     "node-rsa": "1.0.5",
     "parse": "2.7.1",
     "pg-promise": "9.1.4",
