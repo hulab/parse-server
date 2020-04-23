@@ -635,6 +635,45 @@ export class MongoStorageAdapter implements StorageAdapter {
       .catch(err => this.handleError(err));
   }
 
+  updateObjectsByBulk(
+    className: string,
+    schema: SchemaType,
+    operations: any,
+    transactionalSession: ?any
+  ) {
+    schema = convertParseSchemaToMongoSchema(schema);
+    const bulks = operations.map(({updateOne, insertOne}) => {
+      return updateOne ? {
+        updateOne: {
+          filter: transformWhere(className, updateOne.filter, schema),
+          update: transformUpdate(className, updateOne.update, schema),
+          upsert: false
+        }
+      } : {
+        insertOne: {
+          document: parseObjectToMongoObjectForCreate(className, insertOne.document, schema)
+        }
+      };
+    });
+    return this._adaptiveCollection(className)
+      .then(collection =>
+        collection._mongoCollection.bulkWrite(bulks, {
+          session: transactionalSession || undefined
+        })
+      )
+      .then(result => mongoObjectToParseObject(className, result.value, schema))
+      .catch(error => {
+        if (error.code === 11000) {
+          throw new Parse.Error(
+            Parse.Error.DUPLICATE_VALUE,
+            'A duplicate value for a field with unique values was provided'
+          );
+        }
+        throw error;
+      })
+      .catch(err => this.handleError(err));
+  }
+
   // Hopefully we can get rid of this. It's only used for config and hooks.
   upsertOneObject(
     className: string,

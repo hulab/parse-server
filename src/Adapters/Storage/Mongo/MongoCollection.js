@@ -226,6 +226,13 @@ export default class MongoCollection {
     );
   }
 
+  bulkWrite(operations, session) {
+    return this._executeWithTrace(
+      'bulkwrite',
+      this._mongoCollection.bulkWrite(operations, { ordered: false, session })
+    );
+  }
+
   _ensureSparseUniqueIndexInBackground(indexRequest) {
     return new Promise((resolve, reject) => {
       this._mongoCollection.createIndex(
