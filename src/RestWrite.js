@@ -1852,31 +1852,33 @@ RestWrite.prototype._updateResponseWithData = function(response, data) {
 };
 
 function tracePromise(operation, className, promise = Promise.resolve()) {
-  const parent = AWSXRay.getSegment();
-  if (!parent) {
-    return promise;
-  }
-  return new Promise((resolve, reject) => {
-    AWSXRay.captureAsyncFunc(
-      `Parse-Server_RestWrite_${operation}_${className}`,
-      subsegment => {
-        subsegment && subsegment.addAnnotation('Controller', 'RestWrite');
-        subsegment && subsegment.addAnnotation('Operation', operation);
-        className & subsegment &&
-          subsegment.addAnnotation('ClassName', className);
-        (promise instanceof Promise ? promise : Promise.resolve(promise)).then(
-          function(result) {
-            resolve(result);
-            subsegment && subsegment.close();
-          },
-          function(error) {
-            reject(error);
-            subsegment && subsegment.close(error);
-          }
-        );
-      }
-    );
-  });
+  // Temporary removing trace here
+  return promise;
+  // const parent = AWSXRay.getSegment();
+  // if (!parent) {
+  //   return promise;
+  // }
+  // return new Promise((resolve, reject) => {
+  //   AWSXRay.captureAsyncFunc(
+  //     `Parse-Server_RestWrite_${operation}_${className}`,
+  //     subsegment => {
+  //       subsegment && subsegment.addAnnotation('Controller', 'RestWrite');
+  //       subsegment && subsegment.addAnnotation('Operation', operation);
+  //       className & subsegment &&
+  //         subsegment.addAnnotation('ClassName', className);
+  //       (promise instanceof Promise ? promise : Promise.resolve(promise)).then(
+  //         function(result) {
+  //           resolve(result);
+  //           subsegment && subsegment.close();
+  //         },
+  //         function(error) {
+  //           reject(error);
+  //           subsegment && subsegment.close(error);
+  //         }
+  //       );
+  //     }
+  //   );
+  // });
 }
 
 export default RestWrite;

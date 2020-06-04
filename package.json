@@ -37,7 +37,7 @@
     "graphql-relay": "^0.6.0",
     "graphql-tools": "^4.0.7",
     "graphql-upload": "10.0.0",
-    "hulab-xray-sdk": "git+https://github.com/hulab/hulab-xray-sdk.git",
+    "hulab-xray-sdk": "git+https://github.com/hulab/hulab-xray-sdk.git#2.0.0",
     "intersect": "1.0.1",
     "jsonwebtoken": "8.5.1",
     "jwks-rsa": "1.7.0",
