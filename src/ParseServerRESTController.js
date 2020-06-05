@@ -142,30 +142,32 @@ function ParseServerRESTController(applicationId, router) {
 }
 
 function tracePromise(operation, promise = Promise.resolve()) {
-  const parent = AWSXRay.getSegment();
-  if (!parent) {
-    return promise;
-  }
-  return new Promise((resolve, reject) => {
-    AWSXRay.captureAsyncFunc(
-      `Parse-Server_RESTController_${operation}`,
-      subsegment => {
-        subsegment &&
-          subsegment.addAnnotation('Controller', 'ParseServerRESTController');
-        subsegment && subsegment.addAnnotation('Operation', operation);
-        (promise instanceof Promise ? promise : Promise.resolve(promise)).then(
-          function(result) {
-            resolve(result);
-            subsegment && subsegment.close();
-          },
-          function(error) {
-            reject(error);
-            subsegment && subsegment.close(error);
-          }
-        );
-      }
-    );
-  });
+  // Temporary removing trace here
+  return promise;
+  // const parent = AWSXRay.getSegment();
+  // if (!parent) {
+  //   return promise;
+  // }
+  // return new Promise((resolve, reject) => {
+  //   AWSXRay.captureAsyncFunc(
+  //     `Parse-Server_RESTController_${operation}`,
+  //     subsegment => {
+  //       subsegment &&
+  //         subsegment.addAnnotation('Controller', 'ParseServerRESTController');
+  //       subsegment && subsegment.addAnnotation('Operation', operation);
+  //       (promise instanceof Promise ? promise : Promise.resolve(promise)).then(
+  //         function(result) {
+  //           resolve(result);
+  //           subsegment && subsegment.close();
+  //         },
+  //         function(error) {
+  //           reject(error);
+  //           subsegment && subsegment.close(error);
+  //         }
+  //       );
+  //     }
+  //   );
+  // });
 }
 
 export default ParseServerRESTController;

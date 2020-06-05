@@ -306,26 +306,28 @@ function enforceRoleSecurity(method, className, auth) {
 }
 
 function tracePromise(operation, promise = Promise.resolve()) {
-  const parent = AWSXRay.getSegment();
-  if (!parent) {
-    return promise;
-  }
-  return new Promise((resolve, reject) => {
-    AWSXRay.captureAsyncFunc(`Parse-Server_rest_${operation}`, subsegment => {
-      subsegment && subsegment.addAnnotation('Controller', 'rest');
-      subsegment && subsegment.addAnnotation('Operation', operation);
-      (promise instanceof Promise ? promise : Promise.resolve(promise)).then(
-        function(result) {
-          resolve(result);
-          subsegment && subsegment.close();
-        },
-        function(error) {
-          reject(error);
-          subsegment && subsegment.close(error);
-        }
-      );
-    });
-  });
+  // Temporary removing trace here
+  return promise;
+  // const parent = AWSXRay.getSegment();
+  // if (!parent) {
+  //   return promise;
+  // }
+  // return new Promise((resolve, reject) => {
+  //   AWSXRay.captureAsyncFunc(`Parse-Server_rest_${operation}`, subsegment => {
+  //     subsegment && subsegment.addAnnotation('Controller', 'rest');
+  //     subsegment && subsegment.addAnnotation('Operation', operation);
+  //     (promise instanceof Promise ? promise : Promise.resolve(promise)).then(
+  //       function(result) {
+  //         resolve(result);
+  //         subsegment && subsegment.close();
+  //       },
+  //       function(error) {
+  //         reject(error);
+  //         subsegment && subsegment.close(error);
+  //       }
+  //     );
+  //   });
+  // });
 }
 
 module.exports = {
