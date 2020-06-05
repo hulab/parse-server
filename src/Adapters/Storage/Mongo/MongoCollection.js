@@ -259,12 +259,14 @@ export default class MongoCollection {
       return fn;
     }
     return new Promise((resolve, reject) => {
-      AWSXRay.captureAsyncFunc(`MongoDB_${this._mongoCollection.collectionName}`, subsegment => {
+      AWSXRay.captureAsyncFunc(`MongoDB Atlas`, subsegment => {
         try {
-          subsegment && subsegment.addAnnotation('collection', this._mongoCollection.collectionName);
-          subsegment && subsegment.addAnnotation('query', type);
+          subsegment && subsegment.addAttribute('namespace', 'aws');
+          subsegment.addAttribute('aws', {region: process.env.AWS_REGION, database: 'mapstr', operation: `${type.toUpperCase()} ${this._mongoCollection.collectionName}`, type, collection: this._mongoCollection.collectionName, retries: 0});
+          subsegment && subsegment.addAnnotation('Collection', this._mongoCollection.collectionName);
+          subsegment && subsegment.addAnnotation('Operation', type);
           if (query && typeof query === "object") {
-            subsegment && subsegment.addAnnotation('where', JSON.stringify(query));
+            subsegment && subsegment.addMetadata('Query', JSON.stringify(query));
           }
         } catch (error) {
           //
@@ -272,6 +274,7 @@ export default class MongoCollection {
         fn.then(
           function(result) {
             resolve(result);
+            subsegment && subsegment.addAttribute('http', {response: {status: 200}});
             subsegment && subsegment.close();
           },
           function(error) {
