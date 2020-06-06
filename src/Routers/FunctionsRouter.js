@@ -8,6 +8,7 @@ import { promiseEnforceMasterKeyAccess } from '../middlewares';
 import { jobStatusHandler } from '../StatusHandler';
 import _ from 'lodash';
 import { logger } from '../logger';
+import {getSegment} from 'hulab-xray-sdk';
 
 function parseObject(obj) {
   if (Array.isArray(obj)) {
@@ -199,6 +200,10 @@ export class FunctionsRouter extends PromiseRouter {
         },
         error => {
           try {
+            const xray_segment = getSegment();
+            if (xray_segment) {
+              xray_segment.close();
+            }
             logger.error(
               `Failed running cloud function ${functionName} for user ${userString} with:\n  Input: ${cleanInput}\n  Error: ` +
                 JSON.stringify(error),
