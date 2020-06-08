@@ -202,7 +202,7 @@ export class FunctionsRouter extends PromiseRouter {
           try {
             const xray_segment = getSegment();
             if (xray_segment) {
-              xray_segment.close();
+              xray_segment.close(error);
             }
             logger.error(
               `Failed running cloud function ${functionName} for user ${userString} with:\n  Input: ${cleanInput}\n  Error: ` +
