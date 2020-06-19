@@ -695,14 +695,15 @@ const typeToString = (type: SchemaField | string): string => {
 // the mongo format and the Parse format. Soon, this will all be Parse format.
 export default class SchemaController {
   _dbAdapter: StorageAdapter;
+  _cache: any;
   schemaData: { [string]: Schema };
   reloadDataPromise: ?Promise<any>;
   protectedFields: any;
   userIdRegEx: RegExp;
-  allClasses: ?Array<Schema>;
 
-  constructor(databaseAdapter: StorageAdapter) {
+  constructor(databaseAdapter: StorageAdapter, singleSchemaCache: Object) {
     this._dbAdapter = databaseAdapter;
+    this._cache = singleSchemaCache;
     this.schemaData = new SchemaData();
     this.protectedFields = Config.get(Parse.applicationId).protectedFields;
 
@@ -744,8 +745,8 @@ export default class SchemaController {
     if (options.clearCache) {
       return this.setAllClasses();
     }
-    if (this.allClasses && this.allClasses.length) {
-      return Promise.resolve(this.allClasses);
+    if (this._cache.allClasses && this._cache.allClasses.length) {
+      return Promise.resolve(this._cache.allClasses);
     }
     return this.setAllClasses();
   }
@@ -755,7 +756,7 @@ export default class SchemaController {
       .getAllClasses()
       .then(allSchemas => allSchemas.map(injectDefaultSchema))
       .then(allSchemas => {
-        this.allClasses = allSchemas;
+        this._cache.allClasses = allSchemas;
         return allSchemas;
       });
   }
@@ -766,7 +767,7 @@ export default class SchemaController {
     options: LoadSchemaOptions = { clearCache: false }
   ): Promise<Schema> {
     if (options.clearCache) {
-      this.allClasses = undefined;
+      this._cache.allClasses = undefined;
     }
     if (allowVolatileClasses && volatileClasses.indexOf(className) > -1) {
       const data = this.schemaData[className];
@@ -777,7 +778,7 @@ export default class SchemaController {
         indexes: data.indexes,
       });
     }
-    const oneSchema = (this.allClasses || []).find(schema => schema.className === className);
+    const oneSchema = (this._cache.allClasses || []).find(schema => schema.className === className);
     if (oneSchema && !options.clearCache) {
       return Promise.resolve(oneSchema);
     }
@@ -1286,7 +1287,7 @@ export default class SchemaController {
           });
       })
       .then(() => {
-        this.allClasses = undefined;
+        this._cache.allClasses = undefined;
         return Promise.resolve();
       });
   }
@@ -1523,12 +1524,14 @@ export default class SchemaController {
   }
 }
 
+const singleSchemaCache = {};
+
 // Returns a promise for a new Schema.
 const load = (
   dbAdapter: StorageAdapter,
   options: any
 ): Promise<SchemaController> => {
-  const schema = new SchemaController(dbAdapter);
+  const schema = new SchemaController(dbAdapter, singleSchemaCache);
   return schema.reloadData(options).then(() => schema);
 };
 
