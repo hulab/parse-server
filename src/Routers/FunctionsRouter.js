@@ -160,6 +160,17 @@ export class FunctionsRouter extends PromiseRouter {
       context: req.info.context,
     };
 
+    try {
+      const xray_segment = getSegment();
+
+      if (xray_segment) {
+        xray_segment.setUser(request.user ? request.user.id : undefined);
+        xray_segment.addAnnotation("input", logger.truncateLogMessage(JSON.stringify(params)));
+      }
+    } catch (_) {
+      //
+    }
+
     return new Promise(function (resolve, reject) {
       const userString = req.auth && req.auth.user ? req.auth.user.id : undefined;
       const cleanInput = logger.truncateLogMessage(JSON.stringify(params));
