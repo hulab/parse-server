@@ -619,7 +619,10 @@ export class MongoStorageAdapter implements StorageAdapter {
     return this._adaptiveCollection(className)
       .then(collection =>
         collection._mongoCollection.bulkWrite(bulks, {
-          session: transactionalSession || undefined
+          session: transactionalSession || undefined,
+          ordered: false,
+          bypassDocumentValidation: true,
+          writeConcern: {w: 0, j: false}
         })
       )
       .then(result => mongoObjectToParseObject(className, result.value, schema))
