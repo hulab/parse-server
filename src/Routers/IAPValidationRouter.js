@@ -58,7 +58,7 @@ function getFileForProductIdentifier(productIdentifier, req) {
       const products = result.results;
       if (!products || products.length != 1) {
         // Error not found or too many
-        throw new Parse.Error(Parse.Error.OBJECT_NOT_FOUND, 'Object not found.');
+        throw new Parse.Error(Parse.Error.OBJECT_NOT_FOUND, 'Object not found. Purchase for ' + productIdentifier);
       }
 
       var download = products[0].download;

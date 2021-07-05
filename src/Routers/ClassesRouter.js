@@ -87,7 +87,7 @@ export class ClassesRouter extends PromiseRouter {
       )
       .then(response => {
         if (!response.results || response.results.length == 0) {
-          throw new Parse.Error(Parse.Error.OBJECT_NOT_FOUND, 'Object not found.');
+          throw new Parse.Error(Parse.Error.OBJECT_NOT_FOUND, `Object not found. Get ${this.className(req)} - ${req.params.objectId}`);
         }
 
         if (this.className(req) === '_User') {

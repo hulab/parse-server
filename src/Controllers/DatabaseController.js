@@ -595,7 +595,7 @@ class DatabaseController {
               if (validateOnly) {
                 return this.adapter.find(className, schema, query, {}).then(result => {
                   if (!result || !result.length) {
-                    throw new Parse.Error(Parse.Error.OBJECT_NOT_FOUND, 'Object not found.');
+                    throw new Parse.Error(Parse.Error.OBJECT_NOT_FOUND, `Object not found. Update validation ${className} - ${JSON.stringify(query)}`);
                   }
                   return {};
                 });
@@ -629,7 +629,7 @@ class DatabaseController {
         })
         .then((result: any) => {
           if (!result) {
-            throw new Parse.Error(Parse.Error.OBJECT_NOT_FOUND, 'Object not found.');
+            throw new Parse.Error(Parse.Error.OBJECT_NOT_FOUND, `Object not found. Update ${className} - ${JSON.stringify(query)}`);
           }
           if (validateOnly) {
             return result;
@@ -785,7 +785,7 @@ class DatabaseController {
             aclGroup
           );
           if (!query) {
-            throw new Parse.Error(Parse.Error.OBJECT_NOT_FOUND, 'Object not found.');
+            throw new Parse.Error(Parse.Error.OBJECT_NOT_FOUND, `Object not found. Destroy ${className} - ${JSON.stringify(query)}`);
           }
         }
         // delete by query
@@ -1276,7 +1276,7 @@ class DatabaseController {
               }
               if (!query) {
                 if (op === 'get') {
-                  throw new Parse.Error(Parse.Error.OBJECT_NOT_FOUND, 'Object not found.');
+                  throw new Parse.Error(Parse.Error.OBJECT_NOT_FOUND, `Object not found. Get ${className}`);
                 } else {
                   return [];
                 }

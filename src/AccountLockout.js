@@ -92,7 +92,7 @@ export class AccountLockout {
         err.code &&
         err.message &&
         err.code === 101 &&
-        err.message === 'Object not found.'
+        err.message.startsWith('Object not found.')
       ) {
         return; // nothing to update so we are good
       } else {

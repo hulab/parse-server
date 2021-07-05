@@ -250,7 +250,7 @@ RestWrite.prototype.runBeforeSaveTrigger = function () {
       // In the case that there is no permission for the operation, it throws an error
       return databasePromise.then(result => {
         if (!result || result.length <= 0) {
-          throw new Parse.Error(Parse.Error.OBJECT_NOT_FOUND, 'Object not found.');
+          throw new Parse.Error(Parse.Error.OBJECT_NOT_FOUND, `Object not found. ${this.className} ${this.query ? "update query " + JSON.stringify(this.query) : "create query " + JSON.stringify(this.data)}`);
         }
       });
     })
@@ -1102,7 +1102,7 @@ RestWrite.prototype.handleInstallation = function () {
       // Sanity checks when running a query
       if (this.query && this.query.objectId) {
         if (!objectIdMatch) {
-          throw new Parse.Error(Parse.Error.OBJECT_NOT_FOUND, 'Object not found for update.');
+          throw new Parse.Error(Parse.Error.OBJECT_NOT_FOUND, `Object not found. ${this.className} update query ${JSON.stringify(this.query)}`);
         }
         if (
           this.data.installationId &&

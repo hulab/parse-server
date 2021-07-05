@@ -532,7 +532,7 @@ export class MongoStorageAdapter implements StorageAdapter {
       .then(
         ({ result }) => {
           if (result.n === 0) {
-            throw new Parse.Error(Parse.Error.OBJECT_NOT_FOUND, 'Object not found.');
+            throw new Parse.Error(Parse.Error.OBJECT_NOT_FOUND, `Object not found. Delete ${className} - ${JSON.stringify(query)}`);
           }
           return Promise.resolve();
         },
