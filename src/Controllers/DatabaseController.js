@@ -629,7 +629,7 @@ class DatabaseController {
         })
         .then((result: any) => {
           if (!result) {
-            throw new Parse.Error(Parse.Error.OBJECT_NOT_FOUND, `Object not found. Update ${className} - ${JSON.stringify(query)}`);
+            throw new Parse.Error(Parse.Error.OBJECT_NOT_FOUND, `Object not found. Update ${className} - ${originalQuery.objectId} - ${JSON.stringify(update)} - ${JSON.stringify(relationUpdates)}`);
           }
           if (validateOnly) {
             return result;
