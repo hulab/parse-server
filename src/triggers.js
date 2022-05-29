@@ -581,54 +581,6 @@ export function maybeRunQueryTrigger(
             restOptions = restOptions || {};
             restOptions.readPreference = requestObject.readPreference;
           }
-          return trigger(requestObject);
-        })
-      .then(
-        result => {
-          let queryResult = parseQuery;
-          if (result && result instanceof Parse.Query) {
-            queryResult = result;
-          }
-          const jsonQuery = queryResult.toJSON();
-          if (jsonQuery.where) {
-            restWhere = jsonQuery.where;
-          }
-          if (jsonQuery.limit) {
-            restOptions = restOptions || {};
-            restOptions.limit = jsonQuery.limit;
-          }
-          if (jsonQuery.skip) {
-            restOptions = restOptions || {};
-            restOptions.skip = jsonQuery.skip;
-          }
-          if (jsonQuery.include) {
-            restOptions = restOptions || {};
-            restOptions.include = jsonQuery.include;
-          }
-          if (jsonQuery.excludeKeys) {
-            restOptions = restOptions || {};
-            restOptions.excludeKeys = jsonQuery.excludeKeys;
-          }
-          if (jsonQuery.explain) {
-            restOptions = restOptions || {};
-            restOptions.explain = jsonQuery.explain;
-          }
-          if (jsonQuery.keys) {
-            restOptions = restOptions || {};
-            restOptions.keys = jsonQuery.keys;
-          }
-          if (jsonQuery.order) {
-            restOptions = restOptions || {};
-            restOptions.order = jsonQuery.order;
-          }
-          if (jsonQuery.hint) {
-            restOptions = restOptions || {};
-            restOptions.hint = jsonQuery.hint;
-          }
-          if (requestObject.readPreference) {
-            restOptions = restOptions || {};
-            restOptions.readPreference = requestObject.readPreference;
-          }
           if (requestObject.includeReadPreference) {
             restOptions = restOptions || {};
             restOptions.includeReadPreference = requestObject.includeReadPreference;
