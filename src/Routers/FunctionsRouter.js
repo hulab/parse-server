@@ -164,7 +164,9 @@ export class FunctionsRouter extends PromiseRouter {
       const xray_segment = getSegment();
 
       if (xray_segment) {
-        xray_segment.setUser(request.user && request.user.id ? request.user.id : undefined);
+        if (request.user && request.user.id) {
+          xray_segment.setUser(request.user.id);
+        }
         xray_segment.addAnnotation("input", logger.truncateLogMessage(JSON.stringify(params)));
       }
     } catch (_) {
