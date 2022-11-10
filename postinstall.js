@@ -40,7 +40,7 @@ module.exports = function () {
   }
 
   const errorMessage = `
-    ⚠️  parse-server requires at least node@${minimum}!
+    ⚠️  hulab's parse-server version requires at least node@${minimum}!
     You have node@${version}
 
   `;
