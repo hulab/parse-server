@@ -28,10 +28,7 @@ module.exports = function () {
 
 
         Thanks for installing parse 🙏
-  Please consider donating to our open collective
-      to help us maintain this package.
-
-  👉 https://opencollective.com/parse-server
+              (Hulab's version)
 
   `;
   process.stdout.write(openCollective);

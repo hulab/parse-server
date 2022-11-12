@@ -5,7 +5,7 @@ then
   echo "Cannot release docs without GITHUB_ACTIONS set"
   exit 0;
 fi
-REPO="https://github.com/parse-community/parse-server"
+REPO="https://github.com/hulab/parse-server"
 
 rm -rf docs
 git clone -b gh-pages --single-branch $REPO ./docs
