@@ -1,6 +1,6 @@
 {
   "name": "parse-server",
-  "version": "5.3.0-hulab-2",
+  "version": "5.3.0-hulab-4",
   "description": "An express module providing a Parse-compatible API server",
   "main": "lib/index.js",
   "repository": {
@@ -130,6 +130,7 @@
     "coverage": "cross-env MONGODB_VERSION=${MONGODB_VERSION:=5.2.1} MONGODB_TOPOLOGY=${MONGODB_TOPOLOGY:=standalone} MONGODB_STORAGE_ENGINE=${MONGODB_STORAGE_ENGINE:=wiredTiger} TESTING=1 nyc jasmine",
     "start": "node ./bin/parse-server",
     "prettier": "prettier --write {src,spec}/{**/*,*}.js",
+    "prepare": "npm run build",
     "postinstall": "node -p 'require(\"./postinstall.js\")()'",
     "madge:circular": "node_modules/.bin/madge ./src --circular"
   },

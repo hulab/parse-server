@@ -959,10 +959,10 @@ export class MongoStorageAdapter implements StorageAdapter {
           } else {
             returnValue[`_p_${field}`] = `${schema.fields[field].targetClass}$${pipeline[field]}`;
           }
-        } else if (schema.fields[field] && schema.fields[field].type === 'Date') {
-          returnValue[field] = this._convertToDate(pipeline[field]);
-        } else if (pipeline[field] && pipeline[field].__type === "Date") {
-          returnValue[field] = this._convertToDate(pipeline[field].iso);
+        // } else if (schema.fields[field] && schema.fields[field].type === 'Date') {
+        //   returnValue[field] = this._convertToDate(pipeline[field]);
+        // } else if (pipeline[field] && pipeline[field].__type === "Date") {
+        //   returnValue[field] = this._convertToDate(pipeline[field].iso);
         } else {
           returnValue[field] = this._parseAggregateArgs(schema, pipeline[field]);
         }
