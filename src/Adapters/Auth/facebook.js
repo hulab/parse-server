@@ -6,7 +6,7 @@ const util = require('util');
 const jwt = require('jsonwebtoken');
 const httpsRequest = require('./httpsRequest');
 
-const TOKEN_ISSUER = 'https://facebook.com';
+const TOKEN_ISSUER = 'https://www.facebook.com';
 
 function getAppSecretPath(authData, options = {}) {
   const appSecret = options.appSecret;
