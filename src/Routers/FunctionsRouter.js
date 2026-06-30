@@ -175,13 +175,13 @@ export class FunctionsRouter extends PromiseRouter {
 
     return new Promise(function (resolve, reject) {
       const userString = req.auth && req.auth.user ? req.auth.user.id : undefined;
-      const cleanInput = logger.truncateLogMessage(JSON.stringify(params));
+      const cleanInput = JSON.stringify(params);
       const { success, error } = FunctionsRouter.createResponseObject(
         result => {
           try {
             const cleanResult = logger.truncateLogMessage(JSON.stringify(result.response.result));
             logger.info(
-              `Ran cloud function ${functionName} for user ${userString} with:\n  Input: ${cleanInput}\n  Result: ${cleanResult}`,
+              `Ran cloud function ${functionName} for user ${userString} with: Input: ${cleanInput} Result: ${cleanResult}`,
               {
                 functionName,
                 params,
@@ -200,7 +200,7 @@ export class FunctionsRouter extends PromiseRouter {
               xray_segment.close(error);
             }
             logger.error(
-              `Failed running cloud function ${functionName} for user ${userString} with:\n  Input: ${cleanInput}\n  Error: ` +
+              `Failed running cloud function ${functionName} for user ${userString} with: Input: ${cleanInput} Error: ` +
                 JSON.stringify(error),
               {
                 functionName,
