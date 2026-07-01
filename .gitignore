@@ -44,8 +44,6 @@ node_modules
 # visual studio code
 .vscode
 
-# Babel.js
-lib/
 # types/* once we have full typescript support, we can generate types from the typescript files
 !types/tsconfig.json
 

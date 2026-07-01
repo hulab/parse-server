@@ -598,6 +598,42 @@ export class MongoStorageAdapter implements StorageAdapter {
       .catch(err => this.handleError(err));
   }
 
+  createObjects(className: string, schema: SchemaType, objects: any, transactionalSession: ?any) {
+    schema = convertParseSchemaToMongoSchema(schema);
+    const mongoObjects = objects.map(object =>
+      parseObjectToMongoObjectForCreate(className, object, schema)
+    );
+    return this._adaptiveCollection(className)
+      .then(collection => collection.insertMany(mongoObjects, transactionalSession))
+      .catch(error => {
+        if (error.code === 11000) {
+          logger.error('Duplicate key error:', error.message);
+          const err = new Parse.Error(
+            Parse.Error.DUPLICATE_VALUE,
+            'A duplicate value for a field with unique values was provided'
+          );
+          err.underlyingError = error;
+          if (error.message) {
+            const matches = error.message.match(
+              /index:[\sa-zA-Z0-9_\-\.]+\$?([a-zA-Z_-]+)_1/
+            );
+            if (matches && Array.isArray(matches)) {
+              err.userInfo = { duplicated_field: matches[1] };
+            }
+            if (!err.userInfo) {
+              const authDataMatch = error.message.match(/index:\s+(_auth_data_[a-zA-Z0-9_]+_id)/);
+              if (authDataMatch) {
+                err.userInfo = { duplicated_field: authDataMatch[1] };
+              }
+            }
+          }
+          throw err;
+        }
+        throw error;
+      })
+      .catch(err => this.handleError(err));
+  }
+
   // Remove all objects that match the given Parse Query.
   // If no objects match, reject with OBJECT_NOT_FOUND. If objects are found and deleted, resolve with undefined.
   // If there is some other error, reject with INTERNAL_SERVER_ERROR.
@@ -672,9 +708,7 @@ export class MongoStorageAdapter implements StorageAdapter {
           );
           err.underlyingError = error;
           if (error.message) {
-            const matches = error.message.match(
-              /index:[\sa-zA-Z0-9_\-\.]+\$?([a-zA-Z_-]+)_1/
-            );
+            const matches = error.message.match(/index:[\sa-zA-Z0-9_\-\.]+\$?([a-zA-Z_-]+)_1/);
             if (matches && Array.isArray(matches)) {
               err.userInfo = { duplicated_field: matches[1] };
             }
@@ -686,6 +720,60 @@ export class MongoStorageAdapter implements StorageAdapter {
             }
           }
           throw err;
+        }
+        throw error;
+      })
+      .catch(err => this.handleError(err));
+  }
+
+  updateObjectsByBulk(
+    className: string,
+    schema: SchemaType,
+    operations: any,
+    transactionalSession: ?any
+  ) {
+    schema = convertParseSchemaToMongoSchema(schema);
+    const bulks = operations.map(({ updateOne, updateMany, insertOne }) => {
+      if (updateOne) {
+        return {
+          updateOne: {
+            filter: transformWhere(className, updateOne.filter, schema),
+            update: transformUpdate(className, updateOne.update, schema),
+            upsert: false,
+          },
+        };
+      }
+      if (updateMany) {
+        return {
+          updateMany: {
+            filter: transformWhere(className, updateMany.filter, schema),
+            update: transformUpdate(className, updateMany.update, schema),
+            upsert: false,
+          },
+        };
+      }
+      return {
+        insertOne: {
+          document: parseObjectToMongoObjectForCreate(className, insertOne.document, schema),
+        },
+      };
+    });
+    return this._adaptiveCollection(className)
+      .then(collection =>
+        collection._mongoCollection.bulkWrite(bulks, {
+          session: transactionalSession || undefined,
+          ordered: false,
+          bypassDocumentValidation: true,
+          writeConcern: { w: 0, j: false },
+        })
+      )
+      .then(result => mongoObjectToParseObject(className, result.value, schema))
+      .catch(error => {
+        if (error.code === 11000) {
+          throw new Parse.Error(
+            Parse.Error.DUPLICATE_VALUE,
+            'A duplicate value for a field with unique values was provided'
+          );
         }
         throw error;
       })
@@ -1014,7 +1102,7 @@ export class MongoStorageAdapter implements StorageAdapter {
       .catch(err => this.handleError(err));
   }
 
-  // This function will recursively traverse the pipeline and convert any Pointer or Date columns.
+  // This function will recursively traverse the pipeline and convert any Pointer columns.
   // If we detect a pointer column we will rename the column being queried for to match the column
   // in the database. We also modify the value to what we expect the value to be in the database
   // as well.
@@ -1028,8 +1116,9 @@ export class MongoStorageAdapter implements StorageAdapter {
   // If the pipeline is an array, it means we are probably parsing an '$and' or '$or' operator. In
   // that case we need to loop through all of it's children to find the columns being operated on.
   // If the pipeline is an object, then we'll loop through the keys checking to see if the key name
-  // matches one of the schema columns. If it does match a column and the column is a Pointer or
-  // a Date, then we'll convert the value as described above.
+  // matches one of the schema columns. If it does match a Pointer column, then we'll convert the
+  // value as described above. Date values are left untouched to avoid corrupting native MongoDB
+  // aggregation expressions.
   //
   // As much as I hate recursion...this seemed like a good fit for it. We're essentially traversing
   // down a tree to find a "leaf node" and checking to see if it needs to be converted.
@@ -1051,8 +1140,6 @@ export class MongoStorageAdapter implements StorageAdapter {
           } else {
             returnValue[`_p_${field}`] = `${schema.fields[field].targetClass}$${pipeline[field]}`;
           }
-        } else if (schema.fields[field] && schema.fields[field].type === 'Date' && !rawValues) {
-          returnValue[field] = this._convertToDate(pipeline[field]);
         } else {
           returnValue[field] = this._parseAggregateArgs(schema, pipeline[field], rawValues, rawFieldNames);
         }

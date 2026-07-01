@@ -1557,9 +1557,13 @@ RestWrite.prototype.runDatabaseOperation = function () {
   }
 
   if (this.className === '_Role') {
-    this.config.cacheController.role.clear();
-    if (this.config.liveQueryController) {
-      this.config.liveQueryController.clearCachedRoles(this.auth.user);
+    if (this.data && this.data.users && this.data.users.objects) {
+      this.data.users.objects.forEach(({ objectId }) => this.config.cacheController.role.del(objectId));
+    } else {
+      this.config.cacheController.role.clear();
+      if (this.config.liveQueryController) {
+        this.config.liveQueryController.clearCachedRoles(this.auth.user);
+      }
     }
   }
 

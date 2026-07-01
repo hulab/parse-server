@@ -59,6 +59,18 @@ const createRole = function (name, sibling, user) {
 };
 
 describe('Parse Role testing', () => {
+  it('clears only impacted role cache entries when role users change', async () => {
+    const user = await createTestUser();
+    const roleCache = Config.get(Parse.applicationId).cacheController.role;
+    spyOn(roleCache, 'del').and.callThrough();
+    spyOn(roleCache, 'clear').and.callThrough();
+
+    await createRole('TargetedRoleCacheClear', null, user);
+
+    expect(roleCache.del).toHaveBeenCalledWith(user.id);
+    expect(roleCache.clear).not.toHaveBeenCalled();
+  });
+
   it('Do a bunch of basic role testing', done => {
     let user;
     let role;

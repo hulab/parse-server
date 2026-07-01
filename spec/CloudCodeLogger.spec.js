@@ -53,8 +53,9 @@ describe('Cloud Code Logger', () => {
       expect(cloudFunctionMessage.args[0]).toBe('info');
       expect(cloudFunctionMessage.args[1][1].params).toEqual({});
       expect(cloudFunctionMessage.args[1][0]).toMatch(
-        /Ran cloud function loggerTest for user [^ ]* with:\n {2}Input: {}\n {2}Result: {}/
+        /Ran cloud function loggerTest for user [^ ]* with: Input: {} Result: {}/
       );
+      expect(cloudFunctionMessage.args[1][0]).not.toContain('\n');
       expect(cloudFunctionMessage.args[1][1].functionName).toEqual('loggerTest');
       expect(errorMessage.args[0]).toBe('error');
       expect(errorMessage.args[1][2].error).toBe('there was an error');
@@ -100,8 +101,9 @@ describe('Cloud Code Logger', () => {
       expect(cloudTriggerMessage[0]).toBe('info');
       expect(cloudTriggerMessage[2].triggerType).toEqual('beforeSave');
       expect(cloudTriggerMessage[1]).toMatch(
-        /beforeSave triggered for MyObject for user [^ ]*\n {2}Input: {}\n {2}Result: {"object":{}}/
+        /beforeSave triggered for MyObject for user [^ ]*: Input: {} Result: {"object":{}}/
       );
+      expect(cloudTriggerMessage[1]).not.toContain('\n');
       expect(cloudTriggerMessage[2].user).toBe(user.id);
       expect(errorMessage[0]).toBe('error');
       expect(errorMessage[3].error).toBe('there was an error');
@@ -120,7 +122,7 @@ describe('Cloud Code Logger', () => {
     expect(truncatedString.length).toBe(1015); // truncate length + the string '... (truncated)'
   });
 
-  it_id('4a009b1f-9203-49ca-8d48-5b45f4eedbdf')(it)('should truncate input and result of long lines', done => {
+  it_id('4a009b1f-9203-49ca-8d48-5b45f4eedbdf')(it)('should log long input and truncate result on one line', done => {
     const longString = fs.readFileSync(loremFile, 'utf8');
     Parse.Cloud.define('aFunction', req => {
       return req.params;
@@ -131,8 +133,9 @@ describe('Cloud Code Logger', () => {
         const log = spy.calls.mostRecent().args;
         expect(log[0]).toEqual('info');
         expect(log[1]).toMatch(
-          /Ran cloud function aFunction for user [^ ]* with:\n {2}Input: {.*?\(truncated\)$/m
+          /Ran cloud function aFunction for user [^ ]* with: Input: .* Result: .*?\(truncated\)$/
         );
+        expect(log[1]).not.toContain('\n');
         done();
       })
       .then(null, e => done.fail(e));
@@ -183,8 +186,9 @@ describe('Cloud Code Logger', () => {
       const log = spy.calls.mostRecent().args;
       expect(log[0]).toEqual('info');
       expect(log[1]).toMatch(
-        /Ran cloud function aFunction for user [^ ]* with:\n {2}Input: {"foo":"bar"}\n {2}Result: "it worked!/
+        /Ran cloud function aFunction for user [^ ]* with: Input: {"foo":"bar"} Result: "it worked!/
       );
+      expect(log[1]).not.toContain('\n');
       done();
     });
   });
@@ -283,8 +287,9 @@ describe('Cloud Code Logger', () => {
         const log = logs[1].args;
         expect(log[0]).toEqual('error');
         expect(log[1]).toMatch(
-          /Failed running cloud function aFunction for user [^ ]* with:\n {2}Input: {"foo":"bar"}\n {2}Error:/
+          /Failed running cloud function aFunction for user [^ ]* with: Input: {"foo":"bar"} Error:/
         );
+        expect(log[1]).not.toContain('\n');
         const errorString = JSON.stringify(
           new Parse.Error(Parse.Error.SCRIPT_FAILED, 'it failed!')
         );

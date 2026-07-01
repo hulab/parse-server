@@ -80,9 +80,16 @@ export class RedisCacheAdapter {
     return this.client.del(key);
   }
 
-  async clear() {
+  async clear(prefix) {
     debug('clear');
     await this.queue.enqueue(FLUSH_DB_KEY);
+    if (prefix) {
+      const keys = await this.client.keys(`${prefix}*`);
+      if (keys.length === 0) {
+        return;
+      }
+      return this.client.sendCommand(['UNLINK', ...keys]);
+    }
     return this.client.sendCommand(['FLUSHDB']);
   }
 
