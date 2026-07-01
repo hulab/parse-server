@@ -11,6 +11,7 @@ import { logger } from '../logger';
 import { createSanitizedError } from '../Error';
 import Busboy from '@fastify/busboy';
 import Utils from '../Utils';
+import { getSegment } from 'hulab-xray-sdk';
 
 function redactBuffers(obj) {
   if (Buffer.isBuffer(obj)) {
@@ -165,7 +166,35 @@ export class FunctionsRouter extends PromiseRouter {
           throw new Error('Cannot call error() after response has already been sent. Make sure to call success() or error() only once per cloud function execution.');
         }
         responseSent = true;
-        const error = triggers.resolveError(message);
+        let error;
+        if (message instanceof Parse.Error) {
+          error = message;
+        } else {
+          let code = Parse.Error.SCRIPT_FAILED;
+          if (typeof message === 'string') {
+            error = new Parse.Error(code, message);
+          } else {
+            if (Utils.isNativeError(message)) {
+              message = message.message;
+            }
+            if (
+              Utils.isObject(message) &&
+              Object.prototype.hasOwnProperty.call(message, 'code') &&
+              Object.prototype.hasOwnProperty.call(message, 'message')
+            ) {
+              code = message.code;
+              message = message.message;
+            }
+            if (Utils.isObject(message)) {
+              try {
+                message = JSON.stringify(message);
+              } catch {
+                // Ignore serialization errors.
+              }
+            }
+            error = new Parse.Error(code, message);
+          }
+        }
         // If a custom status code was set, attach it to the error
         if (httpStatusCode !== null) {
           error.status = httpStatusCode;
@@ -336,16 +365,31 @@ export class FunctionsRouter extends PromiseRouter {
       context: req.info.context,
     };
 
+    try {
+      const xraySegment = getSegment();
+      if (xraySegment) {
+        if (request.user && request.user.id) {
+          xraySegment.setUser(request.user.id);
+        }
+        xraySegment.addAnnotation(
+          'input',
+          logger.truncateLogMessage(JSON.stringify(redactBuffers(params)))
+        );
+      }
+    } catch {
+      // Ignore tracing errors.
+    }
+
     return new Promise(function (resolve, reject) {
       const userString = req.auth && req.auth.user ? req.auth.user.id : undefined;
+      const cleanInput = JSON.stringify(redactBuffers(params));
       const responseObject = FunctionsRouter.createResponseObject(
         result => {
           try {
             if (req.config.logLevels.cloudFunctionSuccess !== 'silent') {
-              const cleanInput = logger.truncateLogMessage(JSON.stringify(redactBuffers(params)));
               const cleanResult = logger.truncateLogMessage(JSON.stringify(result.response.result));
               logger[req.config.logLevels.cloudFunctionSuccess](
-                `Ran cloud function ${functionName} for user ${userString} with:\n  Input: ${cleanInput}\n  Result: ${cleanResult}`,
+                `Ran cloud function ${functionName} for user ${userString} with: Input: ${cleanInput} Result: ${cleanResult}`,
                 {
                   functionName,
                   params,
@@ -360,10 +404,13 @@ export class FunctionsRouter extends PromiseRouter {
         },
         error => {
           try {
+            const xraySegment = getSegment();
+            if (xraySegment) {
+              xraySegment.close(error);
+            }
             if (req.config.logLevels.cloudFunctionError !== 'silent') {
-              const cleanInput = logger.truncateLogMessage(JSON.stringify(redactBuffers(params)));
               logger[req.config.logLevels.cloudFunctionError](
-                `Failed running cloud function ${functionName} for user ${userString} with:\n  Input: ${cleanInput}\n  Error: ` +
+                `Failed running cloud function ${functionName} for user ${userString} with: Input: ${cleanInput} Error: ` +
                   JSON.stringify(error),
                 {
                   functionName,

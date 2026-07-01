@@ -1,4 +1,6 @@
 // triggers.js
+const AWSXRay = require('hulab-xray-sdk');
+
 import Parse from 'parse/node';
 import { logger } from './logger';
 import Utils from './Utils';
@@ -424,11 +426,11 @@ function logTriggerAfterHook(triggerType, className, input, auth, logLevel) {
   if (logLevel === 'silent') {
     return;
   }
-  const cleanInput = logger.truncateLogMessage(JSON.stringify(input));
+  const cleanInput = JSON.stringify(input);
   logger[logLevel](
     `${triggerType} triggered for ${className} for user ${userIdForLog(
       auth
-    )}:\n  Input: ${cleanInput}`,
+    )}: Input: ${cleanInput}`,
     {
       className,
       triggerType,
@@ -441,12 +443,12 @@ function logTriggerSuccessBeforeHook(triggerType, className, input, result, auth
   if (logLevel === 'silent') {
     return;
   }
-  const cleanInput = logger.truncateLogMessage(JSON.stringify(input));
+  const cleanInput = JSON.stringify(input);
   const cleanResult = logger.truncateLogMessage(JSON.stringify(result));
   logger[logLevel](
     `${triggerType} triggered for ${className} for user ${userIdForLog(
       auth
-    )}:\n  Input: ${cleanInput}\n  Result: ${cleanResult}`,
+    )}: Input: ${cleanInput} Result: ${cleanResult}`,
     {
       className,
       triggerType,
@@ -459,11 +461,11 @@ function logTriggerErrorBeforeHook(triggerType, className, input, auth, error, l
   if (logLevel === 'silent') {
     return;
   }
-  const cleanInput = logger.truncateLogMessage(JSON.stringify(input));
+  const cleanInput = JSON.stringify(input);
   logger[logLevel](
     `${triggerType} failed for ${className} for user ${userIdForLog(
       auth
-    )}:\n  Input: ${cleanInput}\n  Error: ${JSON.stringify(error)}`,
+    )}: Input: ${cleanInput} Error: ${JSON.stringify(error)}`,
     {
       className,
       triggerType,
@@ -602,7 +604,7 @@ export function maybeRunQueryTrigger(
     context,
     isGet
   );
-  return Promise.resolve()
+  const promise = Promise.resolve()
     .then(() => {
       return maybeRunValidator(requestObject, `${triggerType}.${className}`, auth);
     })
@@ -699,6 +701,7 @@ export function maybeRunQueryTrigger(
         throw error;
       }
     );
+  return tracePromise(triggerType, className, promise);
 }
 
 export function resolveError(message, defaultOpts) {
@@ -1151,4 +1154,28 @@ export async function maybeRunGlobalConfigTrigger(triggerType, auth, configObjec
     }
   }
   return configObject;
+}
+
+function tracePromise(type, className, promise = Promise.resolve()) {
+  const parent = AWSXRay.getSegment();
+  if (!parent) {
+    return promise;
+  }
+  return new Promise((resolve, reject) => {
+    AWSXRay.captureAsyncFunc(`Parse-Server_triggers_${type}_${className}`, subsegment => {
+      subsegment && subsegment.addAnnotation('Controller', 'triggers');
+      subsegment && subsegment.addAnnotation('Type', type);
+      subsegment && subsegment.addAnnotation('ClassName', className);
+      (Utils.isPromise(promise) ? promise : Promise.resolve(promise)).then(
+        function (result) {
+          resolve(result);
+          subsegment && subsegment.close();
+        },
+        function (error) {
+          reject(error);
+          subsegment && subsegment.close(error);
+        }
+      );
+    });
+  });
 }

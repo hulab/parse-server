@@ -5,6 +5,26 @@ function wait(sleep) {
     setTimeout(resolve, sleep);
   });
 }
+
+describe('RedisCacheAdapter unit', function () {
+  it('clears keys by prefix with unlink', async () => {
+    const cache = new RedisCacheAdapter(null, 100);
+    cache.client = {
+      on: () => {},
+      keys: jasmine.createSpy('keys').and.resolveTo(['app:role:user1', 'app:role:user2']),
+      sendCommand: jasmine.createSpy('sendCommand').and.resolveTo('OK'),
+    };
+
+    await cache.clear('app:role');
+
+    expect(cache.client.keys).toHaveBeenCalledWith('app:role*');
+    expect(cache.client.sendCommand).toHaveBeenCalledWith([
+      'UNLINK',
+      'app:role:user1',
+      'app:role:user2',
+    ]);
+  });
+});
 /*
 To run this test part of the complete suite
 set PARSE_SERVER_TEST_CACHE='redis'
@@ -35,6 +55,16 @@ describe_only(() => {
     value = await cacheNaN.get(KEY);
     expect(value).toEqual(null);
     await cacheNaN.clear();
+  });
+
+  it('should clear by prefix', async () => {
+    await cache.put('prefix:one', 'one');
+    await cache.put('other:one', 'other');
+
+    await cache.clear('prefix:');
+
+    expect(await cache.get('prefix:one')).toEqual(null);
+    expect(await cache.get('other:one')).toEqual('other');
   });
 
   it('should expire after ttl', done => {

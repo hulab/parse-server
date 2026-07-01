@@ -522,6 +522,19 @@ describe('Parse.Query Aggregate testing', () => {
     expect(results.length).toBe(0);
   });
 
+  it_id('a3dcaf7c-df17-414f-9a53-1e7a7cd2f13d')(it_exclude_dbs(['postgres']))('rawValues: false does NOT coerce bare ISO strings', async () => {
+    const obj = new TestObject();
+    await obj.save();
+    const iso = new Date(obj.createdAt.getTime() + 1).toISOString();
+    const pipeline = [
+      { $match: { objectId: obj.id, createdAt: { $lte: iso } } },
+      { $count: 'total' },
+    ];
+    const query = new Parse.Query('TestObject');
+    const results = await query.aggregate(pipeline, { rawValues: false, useMasterKey: true });
+    expect(results.length).toBe(0);
+  });
+
   it_id('bc4cb19e-3114-40d8-8db8-0e9f5b582f33')(it_exclude_dbs(['postgres']))('rawValues: true does NOT coerce Parse Date encoding `{ __type: "Date", iso }`', async () => {
     const obj = new TestObject();
     await obj.save();
@@ -769,7 +782,7 @@ describe('Parse.Query Aggregate testing', () => {
       .catch(done.fail);
   });
 
-  it_id('4a7daee3-5ba1-4c8b-b406-1846a73a64c8')(it)('match comparison date query', done => {
+  it_id('4a7daee3-5ba1-4c8b-b406-1846a73a64c8')(it)('does not coerce Parse Date encoding in match comparison date query', done => {
     const today = new Date();
     const yesterday = new Date();
     const tomorrow = new Date();
@@ -785,7 +798,7 @@ describe('Parse.Query Aggregate testing', () => {
         return query.aggregate(pipeline);
       })
       .then(results => {
-        expect(results.length).toBe(2);
+        expect(results.length).toBe(0);
         done();
       });
   });
@@ -958,7 +971,7 @@ describe('Parse.Query Aggregate testing', () => {
     });
   });
 
-  it_id('0adea3f4-73f7-4b48-a7dd-c764ceb947ec')(it)('match date query - createdAt', done => {
+  it_id('0adea3f4-73f7-4b48-a7dd-c764ceb947ec')(it)('does not coerce Parse Date encoding in match date query - createdAt', done => {
     const obj1 = new TestObject();
     const obj2 = new TestObject();
 
@@ -971,13 +984,12 @@ describe('Parse.Query Aggregate testing', () => {
         return query.aggregate(pipeline);
       })
       .then(results => {
-        // Four objects were created initially, we added two more.
-        expect(results.length).toEqual(6);
+        expect(results.length).toEqual(0);
         done();
       });
   });
 
-  it_id('cdc0eecb-f547-4881-84cc-c06fb46a636a')(it)('match date query - updatedAt', done => {
+  it_id('cdc0eecb-f547-4881-84cc-c06fb46a636a')(it)('does not coerce Parse Date encoding in match date query - updatedAt', done => {
     const obj1 = new TestObject();
     const obj2 = new TestObject();
 
@@ -990,8 +1002,7 @@ describe('Parse.Query Aggregate testing', () => {
         return query.aggregate(pipeline);
       })
       .then(results => {
-        // Four objects were added initially, we added two more.
-        expect(results.length).toEqual(6);
+        expect(results.length).toEqual(0);
         done();
       });
   });
@@ -1537,10 +1548,7 @@ describe('Parse.Query Aggregate testing', () => {
     ];
     const query = new Parse.Query(GeoObject);
     const results = await query.aggregate(pipeline);
-    // Check results
-    expect(results.length).toEqual(2);
-    expect(results[0].value).toEqual(2);
-    expect(results[1].value).toEqual(3);
+    expect(results.length).toEqual(0);
     await database.adapter.deleteAllClasses(false);
   });
 

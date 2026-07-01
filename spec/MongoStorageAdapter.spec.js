@@ -152,6 +152,68 @@ describe_only_db('mongo')('MongoStorageAdapter', () => {
     expect(capturedOptions.batchSize).toEqual(50);
   });
 
+  it('creates multiple objects with createObjects', async () => {
+    const adapter = new MongoStorageAdapter({ uri: databaseURI });
+    const schema = { fields: { count: { type: 'Number' } } };
+
+    await adapter.createObjects('BulkCreateTest', schema, [
+      { objectId: 'bulk1', count: 1 },
+      { objectId: 'bulk2', count: 2 },
+    ]);
+
+    const results = await adapter._rawFind('BulkCreateTest', {});
+    expect(results.map(result => result._id).sort()).toEqual(['bulk1', 'bulk2']);
+  });
+
+  it('runs updateObjectsByBulk through MongoDB bulkWrite', async () => {
+    const adapter = new MongoStorageAdapter({ uri: databaseURI });
+    const schema = { fields: { count: { type: 'Number' } } };
+    await adapter.createObject('BulkWriteTest', schema, { objectId: 'bulk1', count: 1 });
+
+    const originalBulkWrite = Collection.prototype.bulkWrite;
+    let capturedOperations;
+    let capturedOptions;
+    spyOn(Collection.prototype, 'bulkWrite').and.callFake(function (operations, options) {
+      capturedOperations = operations;
+      capturedOptions = options;
+      return originalBulkWrite.call(this, operations, options);
+    });
+
+    await adapter.updateObjectsByBulk('BulkWriteTest', schema, [
+      {
+        updateOne: {
+          filter: { objectId: 'bulk1' },
+          update: { count: 2 },
+        },
+      },
+      {
+        insertOne: {
+          document: { objectId: 'bulk2', count: 3 },
+        },
+      },
+    ]);
+
+    expect(capturedOperations).toEqual([
+      {
+        updateOne: {
+          filter: { _id: 'bulk1' },
+          update: { $set: { count: 2 } },
+          upsert: false,
+        },
+      },
+      {
+        insertOne: {
+          document: jasmine.objectContaining({ _id: 'bulk2', count: 3 }),
+        },
+      },
+    ]);
+    expect(capturedOptions).toEqual(jasmine.objectContaining({
+      ordered: false,
+      bypassDocumentValidation: true,
+      writeConcern: { w: 0, j: false },
+    }));
+  });
+
   it('defaults batchSize to 1000', async () => {
     await reconfigureServer({
       databaseURI: databaseURI,

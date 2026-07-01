@@ -50,12 +50,15 @@ describe('CacheController', function () {
 
     cache.clear();
     expect(FakeCacheAdapter.clear.calls.count()).toEqual(1);
+    expect(FakeCacheAdapter.clear.calls.mostRecent().args[0]).toEqual(undefined);
 
     cache.user.clear();
     expect(FakeCacheAdapter.clear.calls.count()).toEqual(2);
+    expect(FakeCacheAdapter.clear.calls.mostRecent().args[0]).toEqual([FakeAppID, 'user'].join(':'));
 
     cache.role.clear();
     expect(FakeCacheAdapter.clear.calls.count()).toEqual(3);
+    expect(FakeCacheAdapter.clear.calls.mostRecent().args[0]).toEqual([FakeAppID, 'role'].join(':'));
   });
 
   it('should handle cache rejections', done => {
