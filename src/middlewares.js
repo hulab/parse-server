@@ -14,6 +14,7 @@ import { pathToRegexp } from 'path-to-regexp';
 import RedisStore from 'rate-limit-redis';
 import { createClient } from 'redis';
 import { BlockList, isIPv4 } from 'net';
+import { createHash } from 'crypto';
 import { createSanitizedHttpError, createSanitizedError } from './Error';
 
 export const DEFAULT_ALLOWED_HEADERS =
@@ -638,6 +639,25 @@ export function promiseEnforceMasterKeyAccess(request) {
   return Promise.resolve();
 }
 
+export const getRateLimitStorePrefix = route => {
+  const requestMethods = Array.isArray(route.requestMethods)
+    ? route.requestMethods.map(String).sort()
+    : route.requestMethods
+      ? [String(route.requestMethods)]
+      : [];
+  const rule = JSON.stringify({
+    requestPath: route.requestPath,
+    requestMethods,
+    zone: route.zone || 'ip',
+    requestTimeWindow: route.requestTimeWindow,
+    requestCount: route.requestCount,
+    includeMasterKey: !!route.includeMasterKey,
+    includeInternalRequests: !!route.includeInternalRequests,
+  });
+  const hash = createHash('sha256').update(rule).digest('hex').slice(0, 16);
+  return `parse-server:rate-limit:${hash}:`;
+};
+
 export const addRateLimit = (route, config, cloud) => {
   if (typeof config === 'string') {
     config = Config.get(config);
@@ -675,6 +695,7 @@ export const addRateLimit = (route, config, cloud) => {
     };
     redisStore.connectionPromise();
     redisStore.store = new RedisStore({
+      prefix: getRateLimitStorePrefix(route),
       sendCommand: async (...args) => {
         await redisStore.connectionPromise();
         return client.sendCommand(args);

@@ -1,4 +1,5 @@
 const RedisCacheAdapter = require('../lib/Adapters/Cache/RedisCacheAdapter').default;
+const { getRateLimitStorePrefix } = require('../lib/middlewares');
 const request = require('../lib/request');
 
 const headers = {
@@ -1195,10 +1196,114 @@ describe('rate limit', () => {
       );
       const cache = new RedisCacheAdapter();
       await cache.connect();
-      const value = await cache.get('rl:127.0.0.1');
+      const prefix = getRateLimitStorePrefix({
+        requestPath: '/classes/*path',
+        requestTimeWindow: 10000,
+        requestCount: 1,
+        includeInternalRequests: true,
+      });
+      const value = await cache.get(`${prefix}127.0.0.1`);
       expect(value).toEqual(2);
-      const ttl = await cache.client.ttl('rl:127.0.0.1');
+      const ttl = await cache.client.ttl(`${prefix}127.0.0.1`);
       expect(ttl).toEqual(10);
+    });
+
+    it('isolates Redis rate limits for different routes and windows', async () => {
+      Parse.Cloud.define('rateLimitShort', () => 'short');
+      Parse.Cloud.define('rateLimitLong', () => 'long');
+      const shortRoute = {
+        requestPath: '/functions/rateLimitShort',
+        requestMethods: ['POST'],
+        requestTimeWindow: 10000,
+        requestCount: 1,
+        includeInternalRequests: true,
+        zone: Parse.Server.RateLimitZone.user,
+        redisUrl: 'redis://localhost:6379',
+      };
+      const longRoute = {
+        requestPath: '/functions/rateLimitLong',
+        requestMethods: 'POST',
+        requestTimeWindow: 20000,
+        requestCount: 2,
+        includeInternalRequests: true,
+        zone: Parse.Server.RateLimitZone.user,
+        redisUrl: 'redis://localhost:6379',
+      };
+      await reconfigureServer({ rateLimit: [shortRoute, longRoute] });
+      const user = await Parse.User.signUp('rateLimitUser', 'password');
+
+      expect(await Parse.Cloud.run('rateLimitShort')).toBe('short');
+      expect(await Parse.Cloud.run('rateLimitLong')).toBe('long');
+
+      const cache = new RedisCacheAdapter();
+      await cache.connect();
+      const shortKey = `${getRateLimitStorePrefix(shortRoute)}${user.id}`;
+      const longKey = `${getRateLimitStorePrefix(longRoute)}${user.id}`;
+      expect(shortKey).not.toEqual(longKey);
+      expect(await cache.get(shortKey)).toEqual(1);
+      expect(await cache.get(longKey)).toEqual(1);
+      expect(await cache.client.ttl(shortKey)).toBeGreaterThan(8);
+      expect(await cache.client.ttl(longKey)).toBeGreaterThan(18);
+
+      await expectAsync(Parse.Cloud.run('rateLimitShort')).toBeRejectedWith(
+        new Parse.Error(Parse.Error.CONNECTION_FAILED, 'Too many requests.')
+      );
+      expect(await Parse.Cloud.run('rateLimitLong')).toBe('long');
+    });
+
+    it('isolates multiple Redis rate limits for the same route', async () => {
+      Parse.Cloud.define('rateLimitStacked', () => 'stacked');
+      const shortRoute = {
+        requestPath: '/functions/rateLimitStacked',
+        requestMethods: ['POST', 'PUT'],
+        requestTimeWindow: 10000,
+        requestCount: 1,
+        includeInternalRequests: true,
+        zone: Parse.Server.RateLimitZone.user,
+        redisUrl: 'redis://localhost:6379',
+      };
+      const longRoute = {
+        ...shortRoute,
+        requestMethods: ['PUT', 'POST'],
+        requestTimeWindow: 20000,
+        requestCount: 10,
+      };
+      await reconfigureServer({ rateLimit: [shortRoute, longRoute] });
+      const user = await Parse.User.signUp('rateLimitStackedUser', 'password');
+
+      expect(await Parse.Cloud.run('rateLimitStacked')).toBe('stacked');
+
+      const cache = new RedisCacheAdapter();
+      await cache.connect();
+      const shortKey = `${getRateLimitStorePrefix(shortRoute)}${user.id}`;
+      const longKey = `${getRateLimitStorePrefix(longRoute)}${user.id}`;
+      expect(shortKey).not.toEqual(longKey);
+      expect(await cache.get(shortKey)).toEqual(1);
+      expect(await cache.get(longKey)).toEqual(1);
+      expect(await cache.client.ttl(shortKey)).toBeGreaterThan(8);
+      expect(await cache.client.ttl(longKey)).toBeGreaterThan(18);
+
+      await expectAsync(Parse.Cloud.run('rateLimitStacked')).toBeRejectedWith(
+        new Parse.Error(Parse.Error.CONNECTION_FAILED, 'Too many requests.')
+      );
+      expect(await cache.get(longKey)).toEqual(2);
+    });
+
+    it('canonicalizes rate limit request methods in Redis prefixes', () => {
+      const options = {
+        requestPath: '/functions/test',
+        requestTimeWindow: 10000,
+        requestCount: 1,
+      };
+      expect(
+        getRateLimitStorePrefix({ ...options, requestMethods: ['POST', 'PUT'] })
+      ).toEqual(getRateLimitStorePrefix({ ...options, requestMethods: ['PUT', 'POST'] }));
+      expect(getRateLimitStorePrefix({ ...options, requestMethods: 'POST' })).toEqual(
+        getRateLimitStorePrefix({ ...options, requestMethods: ['POST'] })
+      );
+      expect(getRateLimitStorePrefix({ ...options, requestMethods: /POST|PUT/i })).toEqual(
+        getRateLimitStorePrefix({ ...options, requestMethods: String(/POST|PUT/i) })
+      );
     });
   });
 });
