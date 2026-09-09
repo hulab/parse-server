@@ -1,6 +1,4 @@
 // triggers.js
-const AWSXRay = require('hulab-xray-sdk');
-
 import Parse from 'parse/node';
 import { logger } from './logger';
 import Utils from './Utils';
@@ -701,7 +699,7 @@ export function maybeRunQueryTrigger(
         throw error;
       }
     );
-  return tracePromise(triggerType, className, promise);
+  return promise;
 }
 
 export function resolveError(message, defaultOpts) {
@@ -1154,28 +1152,4 @@ export async function maybeRunGlobalConfigTrigger(triggerType, auth, configObjec
     }
   }
   return configObject;
-}
-
-function tracePromise(type, className, promise = Promise.resolve()) {
-  const parent = AWSXRay.getSegment();
-  if (!parent) {
-    return promise;
-  }
-  return new Promise((resolve, reject) => {
-    AWSXRay.captureAsyncFunc(`Parse-Server_triggers_${type}_${className}`, subsegment => {
-      subsegment && subsegment.addAnnotation('Controller', 'triggers');
-      subsegment && subsegment.addAnnotation('Type', type);
-      subsegment && subsegment.addAnnotation('ClassName', className);
-      (Utils.isPromise(promise) ? promise : Promise.resolve(promise)).then(
-        function (result) {
-          resolve(result);
-          subsegment && subsegment.close();
-        },
-        function (error) {
-          reject(error);
-          subsegment && subsegment.close(error);
-        }
-      );
-    });
-  });
 }

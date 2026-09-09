@@ -1,4 +1,3 @@
-const AWSXRay = require('hulab-xray-sdk');
 const mongodb = require('mongodb');
 const Collection = mongodb.Collection;
 
@@ -90,7 +89,7 @@ export default class MongoCollection {
       explain,
       comment,
     });
-    return this._executeWithTrace('find', findOperation, query).catch(error => {
+    return findOperation.catch(error => {
       // Check for "no geoindex" error
       if (error.code != 17007 && !error.message.match(/unable to find index for .geoNear/)) {
         throw error;
@@ -125,7 +124,7 @@ export default class MongoCollection {
               explain,
               comment,
             });
-            return this._executeWithTrace('find', findOperation, query);
+            return findOperation;
           })
       );
     });
@@ -188,7 +187,7 @@ export default class MongoCollection {
       const countOperation = this._mongoCollection.estimatedDocumentCount({
         maxTimeMS,
       });
-      return this._executeWithTrace('estimatedDocumentCount', countOperation);
+      return countOperation;
     }
 
     const countOperation = this._mongoCollection.countDocuments(query, {
@@ -200,55 +199,52 @@ export default class MongoCollection {
       hint,
       comment,
     });
-    return this._executeWithTrace('countDocuments', countOperation, query);
+    return countOperation;
   }
 
   distinct(field, query) {
-    return this._executeWithTrace('distinct', this._mongoCollection.distinct(field, query));
+    return this._mongoCollection.distinct(field, query);
   }
 
   aggregate(pipeline, { maxTimeMS, batchSize, readPreference, hint, explain, comment } = {}) {
     const aggregateOperation = this._mongoCollection
       .aggregate(pipeline, { maxTimeMS, batchSize, readPreference, hint, explain, comment })
       .toArray();
-    return this._executeWithTrace('aggregate', aggregateOperation);
+    return aggregateOperation;
   }
 
   insertOne(object, session) {
-    return this._executeWithTrace('insertOne', this._mongoCollection.insertOne(object, { session }));
+    return this._mongoCollection.insertOne(object, { session });
   }
 
   insertMany(object, session) {
-    return this._executeWithTrace('insertMany', this._mongoCollection.insertMany(object, { session }));
+    return this._mongoCollection.insertMany(object, { session });
   }
 
   // Atomically updates data in the database for a single (first) object that matched the query
   // If there is nothing that matches the query - does insert
   // Postgres Note: `INSERT ... ON CONFLICT UPDATE` that is available since 9.5.
   upsertOne(query, update, session) {
-    return this._executeWithTrace(
-      'upsertOne',
-      this._mongoCollection.updateOne(query, update, {
-        upsert: true,
-        session,
-      })
-    );
+    return this._mongoCollection.updateOne(query, update, {
+      upsert: true,
+      session,
+    });
   }
 
   updateOne(query, update) {
-    return this._executeWithTrace('updateOne', this._mongoCollection.updateOne(query, update));
+    return this._mongoCollection.updateOne(query, update);
   }
 
   updateMany(query, update, session) {
-    return this._executeWithTrace('updateMany', this._mongoCollection.updateMany(query, update, { session }));
+    return this._mongoCollection.updateMany(query, update, { session });
   }
 
   deleteMany(query, session) {
-    return this._executeWithTrace('deleteMany', this._mongoCollection.deleteMany(query, { session }));
+    return this._mongoCollection.deleteMany(query, { session });
   }
 
   bulkWrite(operations, session) {
-    return this._executeWithTrace('bulkwrite', this._mongoCollection.bulkWrite(operations, { ordered: false, session }));
+    return this._mongoCollection.bulkWrite(operations, { ordered: false, session });
   }
 
   _ensureSparseUniqueIndexInBackground(indexRequest) {
@@ -263,43 +259,4 @@ export default class MongoCollection {
     return this._mongoCollection.drop();
   }
 
-  _executeWithTrace(type, fn, query) {
-    const parent = AWSXRay.getSegment();
-    if (!parent) {
-      return fn;
-    }
-    return new Promise((resolve, reject) => {
-      AWSXRay.captureAsyncFunc('MongoDB Atlas', subsegment => {
-        try {
-          subsegment && subsegment.addAttribute('namespace', 'aws');
-          subsegment.addAttribute('aws', {
-            region: process.env.AWS_REGION,
-            database: 'mapstr',
-            operation: `${type.toUpperCase()} ${this._mongoCollection.collectionName}`,
-            type,
-            collection: this._mongoCollection.collectionName,
-            retries: 0,
-          });
-          subsegment && subsegment.addAnnotation('Collection', this._mongoCollection.collectionName);
-          subsegment && subsegment.addAnnotation('Operation', type);
-          if (query && typeof query === 'object') {
-            subsegment && subsegment.addMetadata('Query', JSON.stringify(query));
-          }
-        } catch {
-          // Ignore tracing serialization errors.
-        }
-        fn.then(
-          function (result) {
-            resolve(result);
-            subsegment && subsegment.addAttribute('http', { response: { status: 200 } });
-            subsegment && subsegment.close();
-          },
-          function (error) {
-            reject(error);
-            subsegment && subsegment.close(error);
-          }
-        );
-      });
-    });
-  }
 }

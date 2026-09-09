@@ -11,11 +11,26 @@ import { logger } from '../logger';
 import { createSanitizedError } from '../Error';
 import Busboy from '@fastify/busboy';
 import Utils from '../Utils';
-import { getSegment } from 'hulab-xray-sdk';
+import { SpanStatusCode, trace } from '@opentelemetry/api';
+
+const traceSecretKey = /authorization|cookie|password|passphrase|secret|token|masterkey|privatekey|api[-_]?key/i;
+const incomingRequestSpan = Symbol.for('mapstr.telemetry.incoming-request-span');
 
 function redactBuffers(obj) {
   if (Buffer.isBuffer(obj)) {
     return `[Buffer: ${obj.length} bytes]`;
+  }
+  if (Utils.isDate(obj) && !Number.isNaN(obj.getTime())) {
+    return obj.toISOString();
+  }
+  if (Utils.isRegExp(obj)) {
+    return obj.toString();
+  }
+  if (obj && typeof obj.toHexString === 'function') {
+    return obj.toHexString();
+  }
+  if (typeof obj === 'bigint') {
+    return obj.toString();
   }
   if (Array.isArray(obj)) {
     return obj.map(redactBuffers);
@@ -28,6 +43,50 @@ function redactBuffers(obj) {
     return result;
   }
   return obj;
+}
+
+function sanitizeTraceParams(obj, key, depth = 0, seen = new WeakSet()) {
+  if (key && traceSecretKey.test(key)) {
+    return '[REDACTED]';
+  }
+  if (Buffer.isBuffer(obj)) {
+    return `[Buffer: ${obj.length} bytes]`;
+  }
+  if (Array.isArray(obj)) {
+    if (depth >= 10 || seen.has(obj)) {
+      return '[TRUNCATED]';
+    }
+    seen.add(obj);
+    const values = obj.slice(0, 20).map(item => sanitizeTraceParams(item, undefined, depth + 1, seen));
+    if (obj.length > values.length) {
+      values.push(`[${obj.length - values.length} more values]`);
+    }
+    return values;
+  }
+  if (obj && typeof obj === 'object') {
+    if (depth >= 10 || seen.has(obj)) {
+      return '[TRUNCATED]';
+    }
+    seen.add(obj);
+    const result = {};
+    const properties = Object.keys(obj).slice(0, 100);
+    for (const property of properties) {
+      result[property] = sanitizeTraceParams(obj[property], property, depth + 1, seen);
+    }
+    if (Object.keys(obj).length > properties.length) {
+      result.__truncated = `${Object.keys(obj).length - properties.length} more keys`;
+    }
+    return result;
+  }
+  if (typeof obj === 'string' && obj.length > 500) {
+    return `${obj.substring(0, 500)}... (truncated)`;
+  }
+  return obj;
+}
+
+function serializeTraceParams(params) {
+  const serialized = JSON.stringify(sanitizeTraceParams(params));
+  return serialized.length > 10000 ? `${serialized.substring(0, 10000)}... (truncated)` : serialized;
 }
 
 function parseObject(obj, config) {
@@ -365,16 +424,16 @@ export class FunctionsRouter extends PromiseRouter {
       context: req.info.context,
     };
 
+    let activeSpan;
     try {
-      const xraySegment = getSegment();
-      if (xraySegment) {
+      activeSpan = req[incomingRequestSpan] || trace.getActiveSpan();
+      if (activeSpan?.isRecording()) {
         if (request.user && request.user.id) {
-          xraySegment.setUser(request.user.id);
+          activeSpan.setAttribute('enduser.id', request.user.id);
         }
-        xraySegment.addAnnotation(
-          'input',
-          logger.truncateLogMessage(JSON.stringify(redactBuffers(params)))
-        );
+        activeSpan.setAttribute('parse.function.name', functionName);
+        activeSpan.setAttribute('parse.function.params', serializeTraceParams(params));
+        activeSpan.setAttribute('aws.xray.annotations', ['parse.function.name']);
       }
     } catch {
       // Ignore tracing errors.
@@ -404,9 +463,9 @@ export class FunctionsRouter extends PromiseRouter {
         },
         error => {
           try {
-            const xraySegment = getSegment();
-            if (xraySegment) {
-              xraySegment.close(error);
+            if (activeSpan) {
+              activeSpan.recordException(error);
+              activeSpan.setStatus({ code: SpanStatusCode.ERROR, message: error.message });
             }
             if (req.config.logLevels.cloudFunctionError !== 'silent') {
               logger[req.config.logLevels.cloudFunctionError](
