@@ -13,7 +13,7 @@ import Busboy from '@fastify/busboy';
 import Utils from '../Utils';
 import { SpanStatusCode, trace } from '@opentelemetry/api';
 
-const traceSecretKey = /authorization|cookie|password|passphrase|secret|token|masterkey|privatekey|api[-_]?key/i;
+const traceSecretKey = /authorization|cookie|password|passphrase|secret|token|masterkey|privatekey|api[-_]?key|receipt|signed(?:payload|transaction)/i;
 const incomingRequestSpan = Symbol.for('mapstr.telemetry.incoming-request-span');
 
 function redactBuffers(obj) {
@@ -51,6 +51,18 @@ function sanitizeTraceParams(obj, key, depth = 0, seen = new WeakSet()) {
   }
   if (Buffer.isBuffer(obj)) {
     return `[Buffer: ${obj.length} bytes]`;
+  }
+  if (Utils.isDate(obj)) {
+    return Number.isNaN(obj.getTime()) ? obj.toString() : obj.toISOString();
+  }
+  if (Utils.isRegExp(obj)) {
+    return obj.toString();
+  }
+  if (obj && typeof obj.toHexString === 'function') {
+    return obj.toHexString();
+  }
+  if (typeof obj === 'bigint') {
+    return obj.toString();
   }
   if (Array.isArray(obj)) {
     if (depth >= 10 || seen.has(obj)) {
