@@ -45,12 +45,12 @@ describe('CacheController', function () {
     });
   });
 
-  it('should clear the entire cache', () => {
+  it('should scope cache clears', () => {
     const cache = new CacheController(FakeCacheAdapter, FakeAppID);
 
     cache.clear();
     expect(FakeCacheAdapter.clear.calls.count()).toEqual(1);
-    expect(FakeCacheAdapter.clear.calls.mostRecent().args[0]).toEqual(undefined);
+    expect(FakeCacheAdapter.clear.calls.mostRecent().args[0]).toEqual(FakeAppID);
 
     cache.user.clear();
     expect(FakeCacheAdapter.clear.calls.count()).toEqual(2);

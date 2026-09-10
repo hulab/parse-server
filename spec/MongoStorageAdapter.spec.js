@@ -179,7 +179,7 @@ describe_only_db('mongo')('MongoStorageAdapter', () => {
       return originalBulkWrite.call(this, operations, options);
     });
 
-    await adapter.updateObjectsByBulk('BulkWriteTest', schema, [
+    const result = await adapter.updateObjectsByBulk('BulkWriteTest', schema, [
       {
         updateOne: {
           filter: { objectId: 'bulk1' },
@@ -212,6 +212,7 @@ describe_only_db('mongo')('MongoStorageAdapter', () => {
       bypassDocumentValidation: true,
       writeConcern: { w: 0, j: false },
     }));
+    expect(result).toBeDefined();
   });
 
   it('defaults batchSize to 1000', async () => {

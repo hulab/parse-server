@@ -76,7 +76,7 @@ export default class MongoCollection {
       delete keys.$score;
       keys.score = { $meta: 'textScore' };
     }
-    const findOperation = this._rawFind(query, {
+    return this._rawFind(query, {
       skip,
       limit,
       sort,
@@ -88,8 +88,7 @@ export default class MongoCollection {
       caseInsensitive,
       explain,
       comment,
-    });
-    return findOperation.catch(error => {
+    }).catch(error => {
       // Check for "no geoindex" error
       if (error.code != 17007 && !error.message.match(/unable to find index for .geoNear/)) {
         throw error;
@@ -110,8 +109,8 @@ export default class MongoCollection {
         this._mongoCollection
           .createIndex(index)
           // Retry, but just once.
-          .then(() => {
-            const findOperation = this._rawFind(query, {
+          .then(() =>
+            this._rawFind(query, {
               skip,
               limit,
               sort,
@@ -123,9 +122,8 @@ export default class MongoCollection {
               caseInsensitive,
               explain,
               comment,
-            });
-            return findOperation;
-          })
+            })
+          )
       );
     });
   }
@@ -184,13 +182,12 @@ export default class MongoCollection {
     // which greatly increases execution time when being run on large collections.
     // See https://github.com/Automattic/mongoose/issues/6713 for more info regarding this problem.
     if (typeof query !== 'object' || !Object.keys(query).length) {
-      const countOperation = this._mongoCollection.estimatedDocumentCount({
+      return this._mongoCollection.estimatedDocumentCount({
         maxTimeMS,
       });
-      return countOperation;
     }
 
-    const countOperation = this._mongoCollection.countDocuments(query, {
+    return this._mongoCollection.countDocuments(query, {
       skip,
       limit,
       sort,
@@ -199,7 +196,6 @@ export default class MongoCollection {
       hint,
       comment,
     });
-    return countOperation;
   }
 
   distinct(field, query) {
@@ -207,10 +203,9 @@ export default class MongoCollection {
   }
 
   aggregate(pipeline, { maxTimeMS, batchSize, readPreference, hint, explain, comment } = {}) {
-    const aggregateOperation = this._mongoCollection
+    return this._mongoCollection
       .aggregate(pipeline, { maxTimeMS, batchSize, readPreference, hint, explain, comment })
       .toArray();
-    return aggregateOperation;
   }
 
   insertOne(object, session) {
@@ -243,10 +238,6 @@ export default class MongoCollection {
     return this._mongoCollection.deleteMany(query, { session });
   }
 
-  bulkWrite(operations, session) {
-    return this._mongoCollection.bulkWrite(operations, { ordered: false, session });
-  }
-
   _ensureSparseUniqueIndexInBackground(indexRequest) {
     return this._mongoCollection.createIndex(indexRequest, {
       unique: true,
@@ -258,5 +249,4 @@ export default class MongoCollection {
   drop() {
     return this._mongoCollection.drop();
   }
-
 }

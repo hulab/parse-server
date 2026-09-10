@@ -122,7 +122,7 @@ describe('Cloud Code Logger', () => {
     expect(truncatedString.length).toBe(1015); // truncate length + the string '... (truncated)'
   });
 
-  it_id('4a009b1f-9203-49ca-8d48-5b45f4eedbdf')(it)('should log long input and truncate result on one line', done => {
+  it_id('4a009b1f-9203-49ca-8d48-5b45f4eedbdf')(it)('should truncate long input and result on one line', done => {
     const longString = fs.readFileSync(loremFile, 'utf8');
     Parse.Cloud.define('aFunction', req => {
       return req.params;
@@ -133,7 +133,7 @@ describe('Cloud Code Logger', () => {
         const log = spy.calls.mostRecent().args;
         expect(log[0]).toEqual('info');
         expect(log[1]).toMatch(
-          /Ran cloud function aFunction for user [^ ]* with: Input: .* Result: .*?\(truncated\)$/
+          /Ran cloud function aFunction for user [^ ]* with: Input: .*?\(truncated\) Result: .*?\(truncated\)$/
         );
         expect(log[1]).not.toContain('\n');
         done();

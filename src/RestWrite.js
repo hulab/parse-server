@@ -1556,7 +1556,12 @@ RestWrite.prototype.runDatabaseOperation = function () {
 
   if (this.className === '_Role') {
     if (this.data && this.data.users && this.data.users.objects) {
-      this.data.users.objects.forEach(({ objectId }) => this.config.cacheController.role.del(objectId));
+      this.data.users.objects.forEach(({ objectId }) => {
+        this.config.cacheController.role.del(objectId);
+        if (this.config.liveQueryController) {
+          this.config.liveQueryController.clearCachedRoles(Parse.User.createWithoutData(objectId));
+        }
+      });
     } else {
       this.config.cacheController.role.clear();
       if (this.config.liveQueryController) {

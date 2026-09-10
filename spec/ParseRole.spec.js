@@ -62,13 +62,18 @@ describe('Parse Role testing', () => {
   it('clears only impacted role cache entries when role users change', async () => {
     const user = await createTestUser();
     const roleCache = Config.get(Parse.applicationId).cacheController.role;
+    const liveQueryController = Config.get(Parse.applicationId).liveQueryController;
     spyOn(roleCache, 'del').and.callThrough();
     spyOn(roleCache, 'clear').and.callThrough();
+    spyOn(liveQueryController, 'clearCachedRoles');
 
     await createRole('TargetedRoleCacheClear', null, user);
 
     expect(roleCache.del).toHaveBeenCalledWith(user.id);
     expect(roleCache.clear).not.toHaveBeenCalled();
+    expect(liveQueryController.clearCachedRoles).toHaveBeenCalledWith(
+      jasmine.objectContaining({ id: user.id })
+    );
   });
 
   it('Do a bunch of basic role testing', done => {
@@ -154,9 +159,7 @@ describe('Parse Role testing', () => {
       return Promise.all(promises);
     };
 
-    const restExecute = spyOn(RestQuery._UnsafeRestQuery.prototype, 'execute').and.callThrough();
-
-    let user, auth, getAllRolesSpy;
+    let user, auth, getAllRolesSpy, restExecute;
     createTestUser()
       .then(newUser => {
         user = newUser;
@@ -178,6 +181,7 @@ describe('Parse Role testing', () => {
         return Parse.Object.saveAll(roles, { useMasterKey: true });
       })
       .then(() => {
+        restExecute = spyOn(RestQuery._UnsafeRestQuery.prototype, 'execute').and.callThrough();
         auth = new Auth({
           config: Config.get('test'),
           isMaster: true,

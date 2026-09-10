@@ -424,7 +424,7 @@ function logTriggerAfterHook(triggerType, className, input, auth, logLevel) {
   if (logLevel === 'silent') {
     return;
   }
-  const cleanInput = JSON.stringify(input);
+  const cleanInput = logger.truncateLogMessage(JSON.stringify(input));
   logger[logLevel](
     `${triggerType} triggered for ${className} for user ${userIdForLog(
       auth
@@ -441,7 +441,7 @@ function logTriggerSuccessBeforeHook(triggerType, className, input, result, auth
   if (logLevel === 'silent') {
     return;
   }
-  const cleanInput = JSON.stringify(input);
+  const cleanInput = logger.truncateLogMessage(JSON.stringify(input));
   const cleanResult = logger.truncateLogMessage(JSON.stringify(result));
   logger[logLevel](
     `${triggerType} triggered for ${className} for user ${userIdForLog(
@@ -459,7 +459,7 @@ function logTriggerErrorBeforeHook(triggerType, className, input, auth, error, l
   if (logLevel === 'silent') {
     return;
   }
-  const cleanInput = JSON.stringify(input);
+  const cleanInput = logger.truncateLogMessage(JSON.stringify(input));
   logger[logLevel](
     `${triggerType} failed for ${className} for user ${userIdForLog(
       auth
@@ -602,7 +602,7 @@ export function maybeRunQueryTrigger(
     context,
     isGet
   );
-  const promise = Promise.resolve()
+  return Promise.resolve()
     .then(() => {
       return maybeRunValidator(requestObject, `${triggerType}.${className}`, auth);
     })
@@ -699,7 +699,6 @@ export function maybeRunQueryTrigger(
         throw error;
       }
     );
-  return promise;
 }
 
 export function resolveError(message, defaultOpts) {

@@ -11,18 +11,37 @@ describe('RedisCacheAdapter unit', function () {
     const cache = new RedisCacheAdapter(null, 100);
     cache.client = {
       on: () => {},
-      keys: jasmine.createSpy('keys').and.resolveTo(['app:role:user1', 'app:role:user2']),
+      scan: jasmine.createSpy('scan').and.resolveTo({
+        cursor: '0',
+        keys: ['app:role:user1', 'app:role:user2'],
+      }),
+      unlink: jasmine.createSpy('unlink').and.resolveTo(2),
       sendCommand: jasmine.createSpy('sendCommand').and.resolveTo('OK'),
     };
 
     await cache.clear('app:role');
 
-    expect(cache.client.keys).toHaveBeenCalledWith('app:role*');
-    expect(cache.client.sendCommand).toHaveBeenCalledWith([
-      'UNLINK',
-      'app:role:user1',
-      'app:role:user2',
-    ]);
+    expect(cache.client.scan).toHaveBeenCalledWith('0', {
+      MATCH: 'app:role:*',
+      COUNT: 100,
+    });
+    expect(cache.client.unlink).toHaveBeenCalledWith(['app:role:user1', 'app:role:user2']);
+  });
+
+  it('escapes glob characters in prefixes', async () => {
+    const cache = new RedisCacheAdapter(null, 100);
+    cache.client = {
+      on: () => {},
+      scan: jasmine.createSpy('scan').and.resolveTo({ cursor: '0', keys: [] }),
+      sendCommand: jasmine.createSpy('sendCommand').and.resolveTo('OK'),
+    };
+
+    await cache.clear('app*');
+
+    expect(cache.client.scan).toHaveBeenCalledWith('0', {
+      MATCH: 'app\\*:*',
+      COUNT: 100,
+    });
   });
 });
 /*
@@ -61,7 +80,7 @@ describe_only(() => {
     await cache.put('prefix:one', 'one');
     await cache.put('other:one', 'other');
 
-    await cache.clear('prefix:');
+    await cache.clear('prefix');
 
     expect(await cache.get('prefix:one')).toEqual(null);
     expect(await cache.get('other:one')).toEqual('other');

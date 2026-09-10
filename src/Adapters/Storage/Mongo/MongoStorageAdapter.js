@@ -767,7 +767,6 @@ export class MongoStorageAdapter implements StorageAdapter {
           writeConcern: { w: 0, j: false },
         })
       )
-      .then(result => mongoObjectToParseObject(className, result.value, schema))
       .catch(error => {
         if (error.code === 11000) {
           throw new Parse.Error(

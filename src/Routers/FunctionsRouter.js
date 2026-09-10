@@ -453,7 +453,7 @@ export class FunctionsRouter extends PromiseRouter {
 
     return new Promise(function (resolve, reject) {
       const userString = req.auth && req.auth.user ? req.auth.user.id : undefined;
-      const cleanInput = JSON.stringify(redactBuffers(params));
+      const cleanInput = logger.truncateLogMessage(JSON.stringify(redactBuffers(params)));
       const responseObject = FunctionsRouter.createResponseObject(
         result => {
           try {

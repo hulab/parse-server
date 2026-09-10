@@ -64,8 +64,8 @@ export class CacheController extends AdaptableController {
   }
 
   clear(prefix) {
-    const cachePrefix = prefix ? joinKeys(this.appId, prefix) : undefined;
-    return this.adapter.clear(cachePrefix);
+    const scope = prefix == null ? this.appId : joinKeys(this.appId, prefix);
+    return this.adapter.clear(scope);
   }
 
   expectedAdapterType() {

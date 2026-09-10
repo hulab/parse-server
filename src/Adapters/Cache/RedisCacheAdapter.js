@@ -4,6 +4,12 @@ import { KeyPromiseQueue } from '../../KeyPromiseQueue';
 
 const DEFAULT_REDIS_TTL = 30 * 1000; // 30 seconds in milliseconds
 const FLUSH_DB_KEY = '__flush_db__';
+const SCAN_COUNT = 100;
+const GLOB_SPECIAL_CHARS = /[?*[\]^\\]/g;
+
+function escapeGlob(value) {
+  return String(value).replace(GLOB_SPECIAL_CHARS, char => `\\${char}`);
+}
 
 function debug(...args: any) {
   const message = ['RedisCacheAdapter: ' + arguments[0]].concat(args.slice(1, args.length));
@@ -81,16 +87,20 @@ export class RedisCacheAdapter {
   }
 
   async clear(prefix) {
-    debug('clear');
+    debug('clear', { prefix });
     await this.queue.enqueue(FLUSH_DB_KEY);
-    if (prefix) {
-      const keys = await this.client.keys(`${prefix}*`);
-      if (keys.length === 0) {
-        return;
-      }
-      return this.client.sendCommand(['UNLINK', ...keys]);
+    if (prefix == null) {
+      return this.client.sendCommand(['FLUSHDB']);
     }
-    return this.client.sendCommand(['FLUSHDB']);
+    const match = `${escapeGlob(prefix)}:*`;
+    let cursor = '0';
+    do {
+      const reply = await this.client.scan(cursor, { MATCH: match, COUNT: SCAN_COUNT });
+      cursor = String(reply.cursor);
+      if (reply.keys.length) {
+        await this.client.unlink(reply.keys);
+      }
+    } while (cursor !== '0');
   }
 
   // Used for testing
