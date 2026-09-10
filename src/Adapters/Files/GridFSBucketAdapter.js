@@ -3,7 +3,6 @@
  Stores files in Mongo using GridFS
  Requires the database adapter to be based on mongoclient
 
- @flow weak
  */
 
 // @flow-disable-next
