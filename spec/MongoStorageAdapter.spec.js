@@ -210,7 +210,7 @@ describe_only_db('mongo')('MongoStorageAdapter', () => {
     expect(capturedOptions).toEqual(jasmine.objectContaining({
       ordered: false,
       bypassDocumentValidation: true,
-      writeConcern: { w: 0, j: false },
+      writeConcern: { w: 1, j: false },
     }));
     expect(result).toBeDefined();
   });

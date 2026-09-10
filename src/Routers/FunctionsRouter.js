@@ -240,31 +240,15 @@ export class FunctionsRouter extends PromiseRouter {
         let error;
         if (message instanceof Parse.Error) {
           error = message;
+        } else if (
+          Utils.isObject(message) &&
+          !Utils.isNativeError(message) &&
+          Object.prototype.hasOwnProperty.call(message, 'code') &&
+          Object.prototype.hasOwnProperty.call(message, 'message')
+        ) {
+          error = new Parse.Error(message.code, message.message);
         } else {
-          let code = Parse.Error.SCRIPT_FAILED;
-          if (typeof message === 'string') {
-            error = new Parse.Error(code, message);
-          } else {
-            if (Utils.isNativeError(message)) {
-              message = message.message;
-            }
-            if (
-              Utils.isObject(message) &&
-              Object.prototype.hasOwnProperty.call(message, 'code') &&
-              Object.prototype.hasOwnProperty.call(message, 'message')
-            ) {
-              code = message.code;
-              message = message.message;
-            }
-            if (Utils.isObject(message)) {
-              try {
-                message = JSON.stringify(message);
-              } catch {
-                // Ignore serialization errors.
-              }
-            }
-            error = new Parse.Error(code, message);
-          }
+          error = triggers.resolveError(message);
         }
         // If a custom status code was set, attach it to the error
         if (httpStatusCode !== null) {

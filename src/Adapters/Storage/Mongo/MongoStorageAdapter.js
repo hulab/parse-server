@@ -764,7 +764,7 @@ export class MongoStorageAdapter implements StorageAdapter {
           session: transactionalSession || undefined,
           ordered: false,
           bypassDocumentValidation: true,
-          writeConcern: { w: 0, j: false },
+          writeConcern: { w: 1, j: false },
         })
       )
       .catch(error => {

@@ -4901,6 +4901,16 @@ describe('beforePasswordResetRequest hook', () => {
       );
     });
 
+    it('should support custom error code with res.error()', async () => {
+      Parse.Cloud.define('expressStyleCustomError', (req, res) => {
+        res.error({ code: 999, message: 'Custom error message' });
+      });
+
+      await expectAsync(Parse.Cloud.run('expressStyleCustomError', {})).toBeRejectedWith(
+        new Parse.Error(999, 'Custom error message')
+      );
+    });
+
     it('should support setting custom HTTP status code with res.status().success()', async () => {
       Parse.Cloud.define('customStatusCode', (req, res) => {
         res.status(201).success({ created: true });
