@@ -212,7 +212,44 @@ describe_only_db('mongo')('MongoStorageAdapter', () => {
       bypassDocumentValidation: true,
       writeConcern: { w: 1, j: false },
     }));
-    expect(result).toBeDefined();
+    expect(result.isOk()).toBeTrue();
+    expect(result.matchedCount).toBe(1);
+    expect(result.modifiedCount).toBe(1);
+    expect(result.insertedCount).toBe(1);
+    const objects = await adapter._rawFind('BulkWriteTest', {});
+    expect(objects.map(({ _id, count }) => ({ _id, count })).sort((a, b) => a._id.localeCompare(b._id)))
+      .toEqual([{ _id: 'bulk1', count: 2 }, { _id: 'bulk2', count: 3 }]);
+  });
+
+  it('preserves pointers and dates across bulk creates and updateMany', async () => {
+    const adapter = new MongoStorageAdapter({ uri: databaseURI });
+    const schema = { fields: {
+      owner: { type: 'Pointer', targetClass: '_User' },
+      date: { type: 'Date' },
+      count: { type: 'Number' },
+    } };
+    const owner = { __type: 'Pointer', className: '_User', objectId: 'owner1' };
+    const date = { __type: 'Date', iso: '2026-10-27T00:00:00.000Z' };
+    const created = await adapter.createObjects('BulkTypesTest', schema, [
+      { objectId: 'bulk1', owner, date, count: 1 },
+      { objectId: 'bulk2', owner, date, count: 2 },
+    ]);
+    expect(created.acknowledged).toBeTrue();
+    expect(created.insertedCount).toBe(2);
+    const updated = await adapter.updateObjectsByBulk('BulkTypesTest', schema, [
+      { updateMany: { filter: { owner }, update: { count: { __op: 'Increment', amount: 3 } } } },
+    ]);
+    expect(updated.matchedCount).toBe(2);
+    expect(updated.modifiedCount).toBe(2);
+    const objects = await adapter._rawFind('BulkTypesTest', {});
+    expect(objects.map(object => object.count).sort()).toEqual([4, 5]);
+    for (const object of objects) {
+      expect(object._p_owner).toBe('_User$owner1');
+      expect(object.date).toEqual(new Date(date.iso));
+    }
+    await expectAsync(adapter.createObjects('BulkTypesTest', schema, [
+      { objectId: 'bulk1', count: 0 },
+    ])).toBeRejectedWith(jasmine.objectContaining({ code: Parse.Error.DUPLICATE_VALUE }));
   });
 
   it('defaults batchSize to 1000', async () => {
@@ -459,6 +496,18 @@ describe_only_db('mongo')('MongoStorageAdapter', () => {
         fail();
         done();
       });
+  });
+
+  it('findOneAndUpdate rethrows errors other than duplicate key errors', async () => {
+    const adapter = new MongoStorageAdapter({ uri: databaseURI });
+    const schema = { fields: { foo: { type: 'String' } } };
+    const error = new Error('Some database error');
+    // Any code other than the duplicate key error code 11000
+    error.code = 2;
+    spyOn(Collection.prototype, 'findOneAndUpdate').and.rejectWith(error);
+    await expectAsync(
+      adapter.findOneAndUpdate('MyClass', schema, {}, { foo: 'bar' })
+    ).toBeRejectedWith(jasmine.is(error));
   });
 
   it('handleShutdown, close connection', async () => {
